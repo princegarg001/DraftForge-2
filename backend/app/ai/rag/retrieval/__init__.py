@@ -1,0 +1,1 @@
+"""Retrievers for dense vectors, keyword filters, and hybrid pipelines."""

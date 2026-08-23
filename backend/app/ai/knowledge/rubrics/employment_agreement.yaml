@@ -1,0 +1,118 @@
+document_type: EMPLOYMENT_AGREEMENT
+jurisdiction: India
+max_score: 100.0
+weights:
+  structure: 20.0
+  clause_coverage: 55.0
+  formatting: 25.0
+penalties:
+  missing_mandatory_clause: 10.0
+  contradiction: 15.0
+required_sections:
+  - name: "Title and Recitals"
+    mandatory: true
+  - name: "Article 1 - Employment and Probation"
+    mandatory: true
+  - name: "Article 2 - Duties and Whole Time Service"
+    mandatory: true
+  - name: "Article 3 - Place of Employment"
+    mandatory: false
+  - name: "Article 4 - Compensation and Statutory Benefits"
+    mandatory: true
+  - name: "Article 5 - Leave and Holidays"
+    mandatory: false
+  - name: "Article 6 - Employee Benefits"
+    mandatory: false
+  - name: "Article 7 - Termination of Employment"
+    mandatory: true
+  - name: "Article 8 - Confidential Information and Inventions"
+    mandatory: true
+  - name: "Article 9 - Protective Covenants and Non-Solicitation"
+    mandatory: true
+  - name: "Article 10 - Construction and Severability"
+    mandatory: false
+  - name: "Article 11 - Remedies and Injunctive Relief"
+    mandatory: false
+  - name: "Article 12 - Existing Restrictive Covenants and Indemnification"
+    mandatory: false
+  - name: "Article 14 - Notices"
+    mandatory: false
+  - name: "Article 17 - Entire Agreement"
+    mandatory: false
+  - name: "Article 21 - Governing Law and Jurisdiction"
+    mandatory: true
+  - name: "Article 22 - Dispute Resolution and Arbitration"
+    mandatory: true
+  - name: "Article 23 - Acknowledgment and Stamp Duty"
+    mandatory: true
+mandatory_clauses:
+  - id: "EMP_ART_1_TERM_PROBATION"
+    name: "Term, Notice-Based Nature & Probation"
+    keywords:
+      - "effective date"
+      - "employment at will"
+      - "probation"
+      - "written notice"
+    min_similarity: 0.65
+  - id: "EMP_ART_2_DUTIES_EXCLUSIVE"
+    name: "Whole Time Devotion and Outside Engagement Restriction"
+    keywords:
+      - "whole time"
+      - "attention"
+      - "conflict"
+      - "office of profit"
+      - "directorship"
+    min_similarity: 0.65
+  - id: "EMP_ART_4_SALARY_STATUTORY"
+    name: "Base Salary and Statutory Benefit Deductions"
+    keywords:
+      - "base salary"
+      - "provident fund"
+      - "employees' provident funds"
+      - "gratuity"
+      - "income-tax act, 1961"
+      - "tax deducted at source"
+    min_similarity: 0.70
+  - id: "EMP_ART_7_TERMINATION_CAUSES"
+    name: "Termination for Cause and Notice Mechanics"
+    keywords:
+      - "prior written notice"
+      - "payment of base salary in lieu"
+      - "cause"
+      - "wilful misconduct"
+      - "gross negligence"
+      - "moral turpitude"
+    min_similarity: 0.70
+  - id: "EMP_ART_8_CONFIDENTIALITY_IP"
+    name: "Confidential Information and Assignment of Inventions"
+    keywords:
+      - "confidential information"
+      - "trade secret"
+      - "return"
+      - "assignment of inventions"
+      - "copyright act, 1957"
+      - "section 17"
+    min_similarity: 0.70
+  - id: "EMP_ART_9_NON_COMPETE_SOLICIT"
+    name: "Section 27 Contract Act Acknowledgment & Non-Solicitation"
+    keywords:
+      - "section 27 of the indian contract act, 1872"
+      - "non-solicitation of customers"
+      - "non-solicitation of employees"
+    min_similarity: 0.70
+  - id: "EMP_ART_21_22_GOV_LAW_ARBITRATION"
+    name: "Governing Law, Arbitration and Court Jurisdiction"
+    keywords:
+      - "laws of india"
+      - "exclusive jurisdiction"
+      - "arbitration and conciliation act, 1996"
+      - "sole arbitrator"
+    min_similarity: 0.70
+  - id: "EMP_ART_23_STAMP_DUTY"
+    name: "Stamp Duty and Admissibility Warning"
+    keywords:
+      - "independent legal advice"
+      - "stamp paper"
+      - "indian stamp act, 1899"
+      - "insufficiently stamped"
+    min_similarity: 0.65

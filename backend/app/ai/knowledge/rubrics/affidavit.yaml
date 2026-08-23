@@ -1,0 +1,86 @@
+document_type: AFFIDAVIT_OF_CHARACTER
+jurisdiction: India
+max_score: 100.0
+weights:
+  structure: 25.0
+  clause_coverage: 50.0
+  formatting: 25.0
+penalties:
+  missing_mandatory_clause: 10.0
+  contradiction: 10.0
+required_sections:
+  - name: "Heading and Statutory Reference"
+    mandatory: true
+  - name: "Opening / Deponent Particulars"
+    mandatory: true
+  - name: "Numbered Averments (paras 1-7)"
+    mandatory: true
+  - name: "Verification Clause"
+    mandatory: true
+  - name: "Deponent Signature and Identification"
+    mandatory: true
+  - name: "Notary / Oath Commissioner Jurat"
+    mandatory: true
+  - name: "Statutory Execution and Stamping Note"
+    mandatory: false
+mandatory_clauses:
+  - id: "AFF_PARA_1_NO_RELATION"
+    name: "No Blood or Marital Relation"
+    keywords:
+      - "unrelated to the applicant"
+      - "blood or marriage"
+      - "same household"
+    min_similarity: 0.65
+  - id: "AFF_PARA_2_NOT_FELLOW_STUDENT"
+    name: "Not a Fellow Law Student"
+    keywords:
+      - "not a fellow law student"
+      - "law school"
+      - "college"
+    min_similarity: 0.65
+  - id: "AFF_PARA_3_PERIOD_KNOWN"
+    name: "Duration of Acquaintance"
+    keywords:
+      - "known the applicant"
+      - "more than one year"
+    min_similarity: 0.60
+  - id: "AFF_PARA_4_CIRCUMSTANCES"
+    name: "Circumstances of Professional Association"
+    keywords:
+      - "chamber as an intern"
+      - "junior associate"
+      - "professional capacity"
+    min_similarity: 0.65
+  - id: "AFF_PARA_5_MORAL_CHARACTER"
+    name: "Honesty, Integrity, and Ethical Judgment"
+    keywords:
+      - "honesty"
+      - "diligence"
+      - "sound ethical judgment"
+      - "integrity and professionalism"
+    min_similarity: 0.70
+  - id: "AFF_PARA_6_NO_PROCEEDINGS"
+    name: "No Disciplinary or Criminal Antecedents"
+    keywords:
+      - "complaint"
+      - "disciplinary proceeding"
+      - "criminal case"
+      - "fitness to practice law"
+      - "disqualifies"
+    min_similarity: 0.70
+  - id: "AFF_PARA_7_NO_INTEREST"
+    name: "No Financial or Personal Interest"
+    keywords:
+      - "advocates act, 1961"
+      - "no personal interest"
+      - "financial or otherwise"
+    min_similarity: 0.65
+  - id: "AFF_VERIFICATION_PERJURY"
+    name: "Verification of Truth and Perjury Liability"
+    keywords:
+      - "true and correct"
+      - "nothing material has been concealed"
+      - "liable to be proceeded against for perjury"
+      - "false statement"
+      - "verified at"
+    min_similarity: 0.70

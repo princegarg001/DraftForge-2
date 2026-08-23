@@ -1,0 +1,94 @@
+document_type: RENT_AGREEMENT
+jurisdiction: India
+max_score: 100.0
+weights:
+  structure: 25.0
+  clause_coverage: 50.0
+  formatting: 25.0
+penalties:
+  missing_mandatory_clause: 10.0
+  contradiction: 15.0
+required_sections:
+  - name: "Opening and Parties Identification"
+    mandatory: true
+  - name: "Recitals and Demised Premises"
+    mandatory: true
+  - name: "Duration of Tenancy (Clause 1)"
+    mandatory: true
+  - name: "Money Matters - Rent, Maintenance, Utilities & Deposit (Clauses 2-6)"
+    mandatory: true
+  - name: "Condition & Use of the Property (Clauses 7-13)"
+    mandatory: true
+  - name: "Protections & Quiet Possession (Clause 14)"
+    mandatory: true
+  - name: "Termination, Breach & Dispute Resolution (Clauses 15-20)"
+    mandatory: true
+  - name: "Registration, Annexure-I & Execution (Clause 21)"
+    mandatory: true
+mandatory_clauses:
+  - id: "RENT_DURATION_CL_1"
+    name: "Tenancy Commencement, Term & Extension"
+    keywords:
+      - "demised premises"
+      - "commence from"
+      - "valid till"
+      - "mutual consent"
+    min_similarity: 0.65
+  - id: "RENT_PAYMENTS_CL_2_4"
+    name: "Monthly Rent, Due Date & Maintenance Charges"
+    keywords:
+      - "monthly rent"
+      - "on or before 7th day"
+      - "maintenance charge"
+      - "elevator"
+      - "generator"
+    min_similarity: 0.70
+  - id: "RENT_UTILITIES_CL_5"
+    name: "Electricity and Water Meter Apportionment"
+    keywords:
+      - "electricity and water"
+      - "bills received from the authorities"
+      - "readings on the respective meters"
+      - "handing over possession"
+    min_similarity: 0.65
+  - id: "RENT_SECURITY_DEPOSIT_CL_6"
+    name: "Interest-Free Refundable Deposit & Possession Retention"
+    keywords:
+      - "interest-free refundable security deposit"
+      - "adjusting any dues"
+      - "normal wear & tear"
+      - "hold possession"
+      - "without payment of rent"
+    min_similarity: 0.70
+  - id: "RENT_USE_REPAIRS_CL_7_10"
+    name: "Residential Purpose, Minor Repairs & Structural Changes"
+    keywords:
+      - "residential purposes only"
+      - "not sublet"
+      - "minor repairs"
+      - "structural or major repairs"
+      - "prior written consent"
+    min_similarity: 0.70
+  - id: "RENT_INSPECTION_QUIET_ENJOY_CL_11_14"
+    name: "Inspection Rights and Quiet Possession Warranty"
+    keywords:
+      - "inspection"
+      - "not exceeding once in a month"
+      - "quiet possession"
+      - "free and harmless"
+    min_similarity: 0.65
+  - id: "RENT_TERMINATION_PENALTY_CL_15_17"
+    name: "One Month Notice and Overstay Double Rent Penalty"
+    keywords:
+      - "one month prior notice"
+      - "two times the rent"
+      - "damages calculated at"
+    min_similarity: 0.70
+  - id: "RENT_REGISTRATION_CL_20_21"
+    name: "Jurisdiction, Registration & Cost Sharing"
+    keywords:
+      - "civil courts"
+      - "registered in front of the registrar"
+      - "stamp duty"
+      - "equally borne"
+    min_similarity: 0.65

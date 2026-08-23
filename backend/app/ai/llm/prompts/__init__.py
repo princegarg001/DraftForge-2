@@ -1,0 +1,1 @@
+"""Catalog of prompt templates for legal education agents."""

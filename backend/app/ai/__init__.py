@@ -1,0 +1,1 @@
+"""AI Layer: Embeddings, RAG, LLMs, and Graph-augmented pipelines."""

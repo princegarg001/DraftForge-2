@@ -1,0 +1,1 @@
+"""Modular RAG framework: chunking, metadata extraction, retrieval, reranking, and context building."""

@@ -1,0 +1,89 @@
+document_type: LEGAL_NOTICE
+jurisdiction: India
+max_score: 100.0
+weights:
+  structure: 25.0
+  clause_coverage: 50.0
+  formatting: 25.0
+penalties:
+  missing_mandatory_clause: 10.0
+  contradiction: 10.0
+required_sections:
+  - name: "Letterhead and Advocate Details"
+    mandatory: true
+  - name: "Title, Date and Recipient Particulars"
+    mandatory: true
+  - name: "Subject Line"
+    mandatory: true
+  - name: "Client Introduction and Authority"
+    mandatory: true
+  - name: "Facts of the Case"
+    mandatory: true
+  - name: "Evidence Available"
+    mandatory: true
+  - name: "Legal Position"
+    mandatory: true
+  - name: "Demand"
+    mandatory: true
+  - name: "Consequences of Non-Compliance"
+    mandatory: true
+  - name: "Reservation of Rights and Closing"
+    mandatory: true
+mandatory_clauses:
+  - id: "NOT_AUTHORITY_INSTRUCTION"
+    name: "Authority and Client Representation"
+    keywords:
+      - "under instructions from and on behalf of"
+      - "client"
+      - "hereby serve upon you"
+    min_similarity: 0.70
+  - id: "NOT_FACTS_CAUSE_ACTION"
+    name: "Chronology of Default and Engagement"
+    keywords:
+      - "employment arrangement"
+      - "discharged all work assigned"
+      - "regular payments made earlier"
+      - "withheld salary"
+      - "repeated polite requests"
+    min_similarity: 0.65
+  - id: "NOT_EVIDENCE_CATALOG"
+    name: "Specific Documentary and Electronic Evidence"
+    keywords:
+      - "payment history"
+      - "whatsapp conversation"
+      - "call recording"
+      - "proof of performance"
+    min_similarity: 0.65
+  - id: "NOT_LEGAL_ENFORCEABILITY"
+    name: "Enforceability of Oral Agreement and Harassment"
+    keywords:
+      - "wrongful withholding"
+      - "oral employment arrangement is enforceable"
+      - "financial loss, mental harassment"
+    min_similarity: 0.65
+  - id: "NOT_SPECIFIC_DEMAND_TIMELINE"
+    name: "Liquidated Sum, Cure Period & Cease and Desist"
+    keywords:
+      - "called upon to"
+      - "unpaid salary"
+      - "within 15 days"
+      - "cease and desist"
+      - "preserve all records"
+    min_similarity: 0.70
+  - id: "NOT_CONSEQUENCE_PROCEEDINGS"
+    name: "Legal Proceedings at Sole Risk and Cost"
+    keywords:
+      - "fail to comply"
+      - "constrained"
+      - "at your sole risk as to cost and consequences"
+      - "initiate appropriate legal proceedings"
+      - "recovery of dues"
+    min_similarity: 0.70
+  - id: "NOT_WITHOUT_PREJUDICE"
+    name: "Without Prejudice and Reservation of Rights"
+    keywords:
+      - "without prejudice to all other rights"
+      - "expressly reserved"
+      - "through counsel"
+      - "advocate"
+    min_similarity: 0.65

@@ -1,0 +1,30 @@
+from enum import Enum
+
+
+class UserRole(str, Enum):
+    STUDENT = "STUDENT"
+    TEACHER = "TEACHER"
+    ADMIN = "ADMIN"
+
+
+class DocumentType(str, Enum):
+    AFFIDAVIT_OF_CHARACTER = "AFFIDAVIT_OF_CHARACTER"
+    EMPLOYMENT_AGREEMENT = "EMPLOYMENT_AGREEMENT"
+    RENT_AGREEMENT = "RENT_AGREEMENT"
+    LEGAL_NOTICE = "LEGAL_NOTICE"
+
+
+class FindingCategory(str, Enum):
+    STRUCTURE = "STRUCTURE"
+    CLAUSE_COVERAGE = "CLAUSE_COVERAGE"
+    FORMATTING = "FORMATTING"
+    GAP = "GAP"
+    CONTRADICTION = "CONTRADICTION"
+    DEPENDENCY = "DEPENDENCY"
+
+
+class FindingStatus(str, Enum):
+    PASS = "PASS"
+    PARTIAL = "PARTIAL"
+    FAIL = "FAIL"
+    WARNING = "WARNING"

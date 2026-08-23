@@ -1,0 +1,1 @@
+"""Cypher query catalog for isolated execution."""
