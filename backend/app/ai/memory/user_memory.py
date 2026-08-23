@@ -26,11 +26,12 @@ class UserLearningMemory:
         if note_addition and note_addition not in notes:
             notes += f" {note_addition}"
 
+        from datetime import datetime, timezone
         payload = {
             "user_id": user_id,
             "learning_notes": notes,
             "frequent_mistakes": mistakes,
             "mastered_concepts": current.get("mastered_concepts", []),
-            "updated_at": "now()"
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
         self.client.table(self.table).upsert(payload).execute()

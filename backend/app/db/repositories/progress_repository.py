@@ -20,12 +20,13 @@ class ProgressRepository:
         doc_performance: Dict[str, List[float]] = {}
 
         for d in drafts:
-            dtype = d["document_type"]
+            dtype = d.get("document_type") or "UNSPECIFIED"
             for v in d.get("draft_versions", []):
                 for e in v.get("evaluations", []):
-                    sc = float(e["overall_score"])
-                    scores.append(sc)
-                    doc_performance.setdefault(dtype, []).append(sc)
+                    if e.get("overall_score") is not None:
+                        sc = float(e["overall_score"])
+                        scores.append(sc)
+                        doc_performance.setdefault(dtype, []).append(sc)
 
         avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
         doc_averages = {

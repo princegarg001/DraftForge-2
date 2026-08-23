@@ -47,7 +47,6 @@ async def list_reference_documents(
 @router.post("/classify", response_model=DocumentClassificationResult)
 async def classify_raw_text(
     text: str = Form(...),
-    current_user: UserProfileDB = Depends(get_current_user)
 ):
     """
     Run rule-based classification against legal text.

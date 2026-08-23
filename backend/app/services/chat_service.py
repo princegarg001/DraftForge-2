@@ -14,8 +14,24 @@ class ChatService:
         self.repo = ConversationRepository()
         self.pipeline = TutorPipeline()
 
-    def create_conversation(self, user_id: str, title: str) -> ConversationResponse:
-        rec = self.repo.create_conversation(user_id=user_id, title=title)
+    def create_conversation(
+        self,
+        user_id: str,
+        title: Optional[str] = None,
+        payload: Optional[Any] = None
+    ) -> ConversationResponse:
+        conv_title = title
+        if not conv_title:
+            if hasattr(payload, "title"):
+                conv_title = payload.title
+            elif isinstance(payload, dict):
+                conv_title = payload.get("title")
+            elif isinstance(payload, str):
+                conv_title = payload
+        if not conv_title:
+            conv_title = "Legal Drafting Tutoring"
+
+        rec = self.repo.create_conversation(user_id=user_id, title=conv_title)
         return ConversationResponse(
             id=rec["id"],
             user_id=rec["user_id"],

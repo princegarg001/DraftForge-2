@@ -1,20 +1,24 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from app.core.constants import DocumentType, FindingCategory, FindingStatus, UserRole
 
 
 class UserProfileDB(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     email: str
-    role: UserRole
+    role: UserRole = UserRole.STUDENT
     full_name: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
 
 
 class ReferenceDocumentDB(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     title: str
     document_type: DocumentType
@@ -24,30 +28,36 @@ class ReferenceDocumentDB(BaseModel):
     file_hash: str
     mime_type: str
     uploaded_by: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[Any] = None
 
 
 class DraftDB(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     user_id: str
     document_type: DocumentType
     title: str
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
 
 
 class DraftVersionDB(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     draft_id: str
     version_number: int
     raw_content: str
     storage_path: Optional[str] = None
     file_hash: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[Any] = None
 
 
 class EvaluationEvidenceDB(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     evaluation_id: str
     category: FindingCategory
@@ -61,10 +71,12 @@ class EvaluationEvidenceDB(BaseModel):
     source_page: Optional[int] = None
     source_section: Optional[str] = None
     explanation: str
-    created_at: datetime
+    created_at: Optional[Any] = None
 
 
 class EvaluationDB(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     draft_version_id: str
     overall_score: float
@@ -79,5 +91,5 @@ class EvaluationDB(BaseModel):
     overridden_score: Optional[float] = None
     overridden_by: Optional[str] = None
     override_reason: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[Any] = None
     evidence_items: List[EvaluationEvidenceDB] = Field(default_factory=list)

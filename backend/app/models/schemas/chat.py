@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from app.core.constants import DocumentType
 
 
@@ -9,11 +9,13 @@ class ConversationCreate(BaseModel):
 
 
 class ConversationResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     user_id: str
     title: str
-    created_at: Any
-    updated_at: Any
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
     summary: Optional[str] = None
 
 
@@ -34,6 +36,8 @@ class SendMessageRequest(BaseModel):
 
 
 class MessageResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     conversation_id: str
     user_id: Optional[str] = None
@@ -41,10 +45,12 @@ class MessageResponse(BaseModel):
     content: str
     model: Optional[str] = None
     retrieved_sources: Optional[List[Dict[str, Any]]] = []
-    created_at: Any
+    created_at: Optional[Any] = None
 
 
 class ChatTurnResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     user_message: MessageResponse
     ai_message: MessageResponse
 
@@ -54,7 +60,9 @@ SendMessageResponse = ChatTurnResponse
 
 
 class ConversationSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     conversation_id: str
     summary_text: str
-    created_at: Any
+    created_at: Optional[Any] = None

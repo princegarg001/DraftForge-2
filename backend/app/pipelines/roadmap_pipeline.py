@@ -16,12 +16,16 @@ class RoadmapPipeline:
 
     async def generate_personalized_roadmap(self, user_id: str) -> Dict[str, Any]:
         # 1. Fetch skill proficiencies
-        student_skills = self.skill_repo.get_student_skills(user_id)
+        student_skills = self.skill_repo.get_student_skills(user_id) or []
         weak_skills = [
-            s["skills"]["name"] for s in student_skills if float(s["proficiency_score"]) < 60.0
+            s["skills"]["name"]
+            for s in student_skills
+            if s.get("skills") and isinstance(s["skills"], dict) and s["skills"].get("name") and float(s.get("proficiency_score", 0)) < 60.0
         ]
         strong_skills = [
-            s["skills"]["name"] for s in student_skills if float(s["proficiency_score"]) >= 75.0
+            s["skills"]["name"]
+            for s in student_skills
+            if s.get("skills") and isinstance(s["skills"], dict) and s["skills"].get("name") and float(s.get("proficiency_score", 0)) >= 75.0
         ]
 
         # 2. Fetch evaluation stats

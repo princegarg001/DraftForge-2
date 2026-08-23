@@ -22,12 +22,13 @@ class DocumentMemory:
         clauses_present: List[str],
         gaps: List[str]
     ) -> Dict[str, Any]:
+        from datetime import datetime, timezone
         payload = {
             "draft_id": draft_id,
             "document_summary": summary,
             "key_clauses_present": clauses_present,
             "identified_gaps": gaps,
-            "updated_at": "now()"
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
         res = self.client.table(self.table).upsert(payload).execute()
         return res.data[0] if res.data else {}

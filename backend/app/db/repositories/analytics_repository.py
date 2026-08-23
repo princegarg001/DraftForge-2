@@ -16,10 +16,12 @@ class AnalyticsRepository:
         # 2. Total Evaluations and Average Score
         eval_res = self.client.table("evaluations").select("overall_score, is_overridden, overridden_score").execute()
         evals = eval_res.data or []
-        scores = [
-            float(e["overridden_score"]) if e["is_overridden"] and e["overridden_score"] is not None else float(e["overall_score"])
-            for e in evals
-        ]
+        scores = []
+        for e in evals:
+            if e.get("is_overridden") and e.get("overridden_score") is not None:
+                scores.append(float(e["overridden_score"]))
+            elif e.get("overall_score") is not None:
+                scores.append(float(e["overall_score"]))
         cohort_avg = round(sum(scores) / len(scores), 2) if scores else 0.0
 
         # 3. Weak-Skill Breakdown
@@ -30,8 +32,12 @@ class AnalyticsRepository:
         )
         skill_aggregates: Dict[str, List[float]] = {}
         for s in skills_res.data or []:
-            name = s["skills"]["name"]
-            skill_aggregates.setdefault(name, []).append(float(s["proficiency_score"]))
+            skill_info = s.get("skills")
+            if not skill_info or not isinstance(skill_info, dict):
+                continue
+            name = skill_info.get("name") or "Unknown Skill"
+            if s.get("proficiency_score") is not None:
+                skill_aggregates.setdefault(name, []).append(float(s["proficiency_score"]))
 
         weak_skills = []
         for name, p_list in skill_aggregates.items():

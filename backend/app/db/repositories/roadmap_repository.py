@@ -41,9 +41,10 @@ class RoadmapRepository(BaseRepository):
         return res.data[0] if res.data else {}
 
     def mark_item_completed(self, item_id: str) -> Dict[str, Any]:
+        from datetime import datetime, timezone
         payload = {
             "is_completed": True,
-            "completed_at": "now()",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
         }
         res = self.client.table("roadmap_items").update(payload).eq("id", item_id).execute()
         return res.data[0] if res.data else {}

@@ -8,11 +8,16 @@ logger = get_logger("fastembed_provider")
 settings = get_settings()
 
 
+_cached_models = {}
+
 class FastEmbedProvider(BaseEmbeddingProvider):
     def __init__(self, model_name: str = None):
+        global _cached_models
         self.model_name = model_name or settings.EMBEDDING_MODEL
-        logger.info(f"Loading FastEmbed model: {self.model_name}")
-        self.model = TextEmbedding(model_name=self.model_name)
+        if self.model_name not in _cached_models:
+            logger.info(f"Loading FastEmbed model: {self.model_name}")
+            _cached_models[self.model_name] = TextEmbedding(model_name=self.model_name)
+        self.model = _cached_models[self.model_name]
         self._dimension = 384  # Default for BAAI/bge-small-en-v1.5
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:

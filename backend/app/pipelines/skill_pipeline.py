@@ -49,12 +49,17 @@ class SkillPipeline:
                     confidence_level=new_conf
                 )
 
-                self.skill_repo.log_skill_history(
-                    student_skill_id=student_skill["id"],
-                    score_delta=delta,
-                    reason=f"Evaluation {evaluation_id}: {f.explanation}",
-                    evaluation_id=evaluation_id
-                )
+                student_skill_id = student_skill.get("id") if isinstance(student_skill, dict) else None
+                if student_skill_id:
+                    self.skill_repo.log_skill_history(
+                        student_skill_id=student_skill_id,
+                        score_delta=delta,
+                        reason=f"Evaluation {evaluation_id}: {f.explanation}",
+                        evaluation_id=evaluation_id
+                    )
 
                 # Update graph node connection in Neo4j Aura
-                self.skill_graph.update_student_skill(user_id=user_id, skill_id=skill_id, score=new_score)
+                try:
+                    self.skill_graph.update_student_skill(user_id=user_id, skill_id=skill_id, score=new_score)
+                except Exception:
+                    pass

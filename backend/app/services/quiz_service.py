@@ -26,14 +26,22 @@ class QuizService:
 
         questions = []
         for q in record.get("quiz_questions", []):
-            opts = [QuizOption(**o) for o in q["options"]]
+            opts = []
+            for idx, o in enumerate(q.get("options") or []):
+                if isinstance(o, dict):
+                    opts.append(QuizOption(key=o.get("key", chr(65 + idx)), text=o.get("text", str(o))))
+                elif isinstance(o, str):
+                    opts.append(QuizOption(key=chr(65 + idx), text=o))
+                else:
+                    opts.append(QuizOption(key=chr(65 + idx), text=str(o)))
+
             questions.append(
                 QuizQuestionResponse(
                     id=q["id"],
                     quiz_id=q["quiz_id"],
                     question_text=q["question_text"],
                     options=opts,
-                    order_index=q["order_index"]
+                    order_index=q.get("order_index", 1)
                 )
             )
 

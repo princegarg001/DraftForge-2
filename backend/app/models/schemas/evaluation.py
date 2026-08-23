@@ -1,10 +1,12 @@
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Any, List, Optional
+from pydantic import BaseModel, ConfigDict
 from app.core.constants import FindingCategory, FindingStatus
 
 
 class EvaluationFindingResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: Optional[str] = None
     category: FindingCategory
     criterion: str
@@ -20,6 +22,8 @@ class EvaluationFindingResponse(BaseModel):
 
 
 class EvaluationResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     draft_version_id: str
     overall_score: float
@@ -32,7 +36,7 @@ class EvaluationResponse(BaseModel):
     llm_explanation: Optional[str] = None
     is_overridden: bool = False
     overridden_score: Optional[float] = None
-    created_at: datetime
+    created_at: Optional[Any] = None
     evidence_items: List[EvaluationFindingResponse] = []
 
 

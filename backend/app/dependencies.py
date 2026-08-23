@@ -39,9 +39,11 @@ async def get_current_user(
 
 def require_role(allowed_roles: list[UserRole]):
     def role_checker(current_user: UserProfileDB = Depends(get_current_user)) -> UserProfileDB:
-        if current_user.role not in allowed_roles:
+        user_role_str = str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role).upper()
+        allowed_str = [str(r.value if hasattr(r, "value") else r).upper() for r in allowed_roles]
+        if user_role_str not in allowed_str:
             raise PermissionDeniedError(
-                f"Operation restricted to roles: {[r.value for r in allowed_roles]}. Current role: {current_user.role.value}"
+                f"Operation restricted to roles: {allowed_str}. Current role: {user_role_str}"
             )
         return current_user
     return role_checker

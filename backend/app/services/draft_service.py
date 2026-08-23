@@ -140,7 +140,7 @@ class DraftService:
             document_type=record["document_type"],
             title=record["title"],
             status=record["status"],
-            created_at=record["created_at"],
-            updated_at=record["updated_at"],
+            created_at=record.get("created_at"),
+            updated_at=record.get("updated_at"),
             versions=versions
         )

@@ -36,12 +36,13 @@ class SkillRepository(BaseRepository):
         proficiency_score: float,
         confidence_level: float
     ) -> Dict[str, Any]:
+        from datetime import datetime, timezone
         payload = {
             "user_id": user_id,
             "skill_id": skill_id,
             "proficiency_score": proficiency_score,
             "confidence_level": confidence_level,
-            "updated_at": "now()",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         res = self.client.table("student_skills").upsert(payload).execute()
         return res.data[0] if res.data else {}
