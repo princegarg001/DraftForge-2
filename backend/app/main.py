@@ -48,8 +48,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.include_router(api_v1_router)
@@ -62,4 +63,12 @@ async def root():
         "version": settings.APP_VERSION,
         "docs": "/docs",
         "health": "/api/v1/health"
+    }
+
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+        "version": settings.APP_VERSION
     }

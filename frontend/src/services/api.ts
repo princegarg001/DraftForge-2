@@ -27,9 +27,18 @@ import {
   HealthCheckResponse,
 } from '../types';
 
-// src/services/api.ts
-export const API_BASE_URL =
-  `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1`;
+const getBaseUrl = (): string => {
+  let envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl || typeof envUrl !== 'string' || !envUrl.trim()) {
+    envUrl = import.meta.env.PROD
+      ? 'https://draftforge-2-d9mc.onrender.com'
+      : 'http://localhost:8000';
+  }
+  const cleanUrl = envUrl.trim().replace(/\/+$/, '');
+  return cleanUrl.endsWith('/api/v1') ? cleanUrl : `${cleanUrl}/api/v1`;
+};
+
+export const API_BASE_URL = getBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

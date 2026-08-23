@@ -12,7 +12,18 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     ENVIRONMENT: str = "production"
-    ALLOWED_ORIGINS: Union[str, List[str]] = "http://localhost:3000"
+    ALLOWED_ORIGINS: Union[str, List[str]] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+            "https://draftforge-2-1.onrender.com",
+            "https://draftforge-2-d9mc.onrender.com",
+        ]
+    )
 
     # Supabase Configuration
     SUPABASE_URL: str
@@ -50,9 +61,33 @@ class Settings(BaseSettings):
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_allowed_origins(cls, value: Union[str, List[str]]) -> List[str]:
+        default_origins = [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+            "https://draftforge-2-1.onrender.com",
+            "https://draftforge-2-d9mc.onrender.com",
+        ]
+        if not value:
+            return default_origins
+
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+            parsed = [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
+        elif isinstance(value, list):
+            parsed = [origin.strip().rstrip("/") if isinstance(origin, str) else origin for origin in value]
+        else:
+            parsed = []
+
+        seen = set()
+        combined = []
+        for origin in parsed + default_origins:
+            if origin and origin not in seen:
+                seen.add(origin)
+                combined.append(origin)
+        return combined
 
     model_config = SettingsConfigDict(
         env_file=".env",
