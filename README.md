@@ -15,6 +15,28 @@
 
 ---
 
+## 📚 Full documentation
+
+This README is the overview. The complete documentation — architecture
+deep-dives, end-to-end flows with sequence diagrams, the security and threat
+models, runbooks and decision records — lives in [`docs/`](docs/) as a VitePress
+site.
+
+```bash
+cd docs && npm install && npm run dev
+```
+
+| Start here | For |
+| :--- | :--- |
+| [Quickstart](docs/guide/quickstart.md) | Getting it running locally |
+| [System overview](docs/architecture/overview.md) | How the pieces fit together |
+| [Flows](docs/flows/overview.md) | Following a request end to end |
+| [Security model](docs/security/model.md) | Trust boundaries and how they are enforced |
+| [Runbooks](docs/operations/runbooks.md) | Diagnosing production |
+| [Decision records](docs/reference/decisions.md) | Why things are the way they are |
+
+---
+
 ## 📌 Table of Contents
 
 - [1. Overview & Problem Statement](#1-overview--problem-statement)
@@ -211,16 +233,26 @@ Supported Indian Document Types:
 - Override evaluation scores with custom faculty notes.
 - View class-wide cohort analytics and weak-skill distributions.
 
-### 5.8 Authentication & Role-Based Access Control (RBAC)
-- Supabase JWT verification with signature checks and public key caching.
-- Case-insensitive role validation supporting `STUDENT`, `TEACHER`, and `ADMIN`.
-- Automatic user profile provisioning in PostgreSQL upon first authenticated request.
+### 5.8 Authentication, Roles & Class Onboarding
+- **Invitation-based onboarding.** Students do not self-register. An instructor creates a class, adds students by email, and each receives an invitation to set their own password. Only a SHA-256 hash of the invitation token is stored.
+- **Gated faculty registration.** Instructor accounts require an institution-issued registration code, itself stored hashed and use-limited.
+- **Server-assigned roles.** The role never travels in a request; it is read from the database on every call.
+- **Local JWT verification** against the project's cached JWKS, with no per-request round trip to Supabase Auth.
+- **Class-scoped data.** Assignments, submissions, cohort analytics and the leaderboard are all scoped through class membership rather than spanning every user on the platform.
+
+See [Onboarding & invitations](docs/flows/onboarding.md) for the full flow.
 
 ---
 
-## 6. Complete API Endpoint Inventory (45 Endpoints)
+## 6. API Endpoint Inventory
 
-DraftForge features **45 registered endpoints** under `app.main:app`:
+DraftForge exposes **60 endpoints** under `app.main:app`. The table below lists
+the original 45; the 15 added for class management, invitations and session
+handling are documented in the [API reference](docs/reference/api.md).
+
+> Two entries below have changed access since: `POST /api/v1/auth/register` no
+> longer accepts a `role` (it always creates a student), and
+> `GET /api/v1/health` now requires authentication.
 
 | # | Group | Method | Path | Role / Access | Description |
 | :-: | :--- | :--- | :--- | :--- | :--- |
@@ -274,10 +306,12 @@ DraftForge features **45 registered endpoints** under `app.main:app`:
 
 ## 7. PostgreSQL Database Architecture & Migrations
 
-The relational schema is organized into 4 sequential SQL migrations:
+The relational schema is organized into 6 sequential SQL migrations (newest first):
 
 | Migration | File | Tables Created | Description |
 | :--- | :--- | :--- | :--- |
+| **006** | `006_classes_and_invitations.sql` | `classes`, `class_enrollments`, `invitations`, `faculty_registration_codes`, `email_outbox` | Teacher-driven rosters, hashed single-use invitation tokens, gated faculty registration, and email delivery records. Adds `assignments.class_id`. |
+| **005** | `005_row_level_security.sql` | `audit_log` | Row-level security on all 23 tables, `SECURITY DEFINER` ownership helpers, column grants withholding answer keys, `profiles.is_active`, and an append-only audit trail. |
 | **001** | `001_initial_schema.sql` | `profiles`, `reference_documents`, `drafts`, `draft_versions`, `evaluations`, `evaluation_evidence`, `skills`, `student_skills`, `skill_history`, `roadmaps`, `roadmap_items` | User profiles, master reference precedents, multi-version drafts, rubric evaluations, evidence citations, skill proficiencies, and roadmaps. |
 | **002** | `002_memory_and_summaries.sql` | `conversations`, `messages`, `user_memories`, `document_memories` | Multi-turn chat conversations, message history, user pedagogical memories, and document context summaries. |
 | **003** | `003_exercises_and_quizzes.sql` | `exercises`, `exercise_attempts`, `quizzes`, `quiz_questions`, `quiz_attempts` | Interactive drafting scenarios, attempt grading, MCQ question banks, and quiz attempt scoring breakdowns. |
@@ -590,11 +624,22 @@ dist/assets/index-Cbnb7AnK.js   473.03 kB │ gzip: 120.45 kB
 
 ## 13. Security Architecture
 
-1. **JWT Verification**: Validates issuer, expiration, and signature using the Supabase JWT secret.
-2. **Role-Based Access Control**: Strict dependency checks (`require_student`, `require_teacher`, `require_admin`) with case-insensitive normalization.
-3. **Data Isolation & Ownership**: All draft revision, version creation, and evaluation endpoints strictly verify that `draft.user_id == current_user.id`.
-4. **CORS Regex Protection**: Dynamically accepts requests from localhost, loopback interfaces, and designated production domains (`allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://.*\.onrender\.com$"`).
-5. **No Secrets in Source Code**: All credentials, keys, and tokens are loaded via environment variables using Pydantic Settings.
+> Full detail: **[Security model](docs/security/model.md)** · **[Threat model](docs/security/threat-model.md)** · **[Row-level security](docs/security/row-level-security.md)**
+
+The governing principle: **the token establishes _who_ the caller is; the
+database decides _what_ they may do.**
+
+1. **Local JWS verification** — tokens are verified in-process against the project's cached JWKS (or the shared secret for legacy HS256), with full claim validation. No network round trip to Supabase Auth on the request path. The permitted algorithm is derived from the selected key rather than the token header, which is what closes algorithm confusion.
+2. **Server-assigned roles** — `role` is absent from every request schema (`extra="forbid"`, so a client sending one fails loudly). The role is read from `profiles` on every request; `ADMIN` is never granted implicitly. Faculty accounts require an institution-issued registration code.
+3. **Three authorization layers** — a role gate (may this *kind* of user call this endpoint), a per-resource ownership check (may *this* user touch *this* row), and row-level security in Postgres as the backstop. Unauthorized resources return **404, not 403**, so endpoints cannot be used to enumerate ids.
+4. **Row-level security** — enabled on all 23 tables with policies keyed on `auth.uid()`, plus column-level grants that withhold quiz answer keys and exercise model solutions from students.
+5. **Rate limiting & budgets** — Redis sliding-window limits per scope (auth, LLM, upload, invite), plus a per-user daily LLM token budget, because request counts cannot bound inference spend. Fails **closed** in production.
+6. **Exact-origin CORS** — an explicit allowlist validated at startup; `*` is rejected and https is required in production.
+7. **Hardened edge** — HSTS, CSP, `X-Content-Type-Options`, `X-Frame-Options`, referrer and permissions policies, trusted-host checking, streaming body-size limits, and `/docs` disabled in production.
+8. **Real upload validation** — content type is established from magic bytes, not the client-supplied header or extension; DOCX is verified as genuine WordprocessingML with decompression-bomb guards; filenames are sanitized before building any storage path.
+9. **Sanitized errors** — a uniform `{code, detail, request_id}` envelope. Upstream exception text, storage paths and provider responses are logged, never returned.
+10. **Audit trail** — grade overrides, role grants, reference uploads and invitation lifecycle are recorded append-only; the table grants no `UPDATE` or `DELETE`.
+11. **No secrets in source** — credentials come from the environment; gitleaks scans full history in CI, and the frontend build output is checked for accidentally bundled secrets.
 
 ---
 
@@ -620,6 +665,15 @@ dist/assets/index-Cbnb7AnK.js   473.03 kB │ gzip: 120.45 kB
 ### Current Limitations
 1. **Document Types**: The rubric engine currently supports 4 foundational Indian legal document types (`AFFIDAVIT_OF_CHARACTER`, `EMPLOYMENT_AGREEMENT`, `RENT_AGREEMENT`, `LEGAL_NOTICE`).
 2. **Jurisdiction Scope**: The reference standard knowledge base is primarily indexed for Indian statutory laws (Indian Contract Act, Negotiable Instruments Act, CPC, State Stamp Acts).
+
+### Known Security Gaps
+
+Stated openly rather than omitted — see the [threat model](docs/security/threat-model.md) for the full assessment.
+
+- **Repositories still use the Supabase service-role key**, which is `BYPASSRLS`. The policies in migration 005 currently defend against key leakage and direct database access rather than the API's own queries. `get_user_scoped_client()` exists for the migration.
+- **Tokens are stored in `localStorage`**, so an XSS would expose them. Mitigated by a strict CSP; httpOnly cookies are the real fix.
+- **No prompt-injection defences** on the tutor path yet.
+- **No MFA** on instructor accounts, which can alter academic records.
 
 ### Future Roadmap
 - [ ] Expand document types to include Commercial Bail Applications, Writ Petitions, and Sale Deeds.
