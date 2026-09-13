@@ -1,0 +1,16 @@
+{
+  "name": "draftforge-docs",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.3.4",
+    "mermaid": "^11.2.0",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}
