@@ -76,7 +76,10 @@ class ValidationFailedError(BaseAppException):
     code = "validation_failed"
 
     def __init__(self, detail: str = "The request payload failed validation.") -> None:
-        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+        # Numeric literals rather than starlette.status constants: the names for
+        # 413 and 422 were renamed, so the constants warn on new versions and
+        # are missing on old ones.
+        super().__init__(status_code=422, detail=detail)
 
 
 class PayloadTooLargeError(BaseAppException):
@@ -84,7 +87,7 @@ class PayloadTooLargeError(BaseAppException):
 
     def __init__(self, limit_bytes: int) -> None:
         super().__init__(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=413,
             detail=f"Request body exceeds the maximum permitted size of {limit_bytes // (1024 * 1024)} MB.",
         )
 

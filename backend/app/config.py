@@ -191,10 +191,15 @@ class Settings(BaseSettings):
             raise ValueError("ALLOWED_ORIGINS must list at least one https origin in production.")
         if "*" in self.TRUSTED_HOSTS:
             raise ValueError("TRUSTED_HOSTS must be an explicit list in production, not '*'.")
-        if self.RATE_LIMIT_ENABLED and not self.REDIS_REQUIRED:
+        # Both halves matter. REDIS_REQUIRED=False lets limits fail open the
+        # moment Redis blips, and RATE_LIMIT_ENABLED=False removes them
+        # outright - which would leave the LLM endpoints unmetered again.
+        if not self.RATE_LIMIT_ENABLED:
+            raise ValueError("RATE_LIMIT_ENABLED must be True in production.")
+        if not self.REDIS_REQUIRED:
             raise ValueError(
-                "REDIS_REQUIRED must be True in production while rate limiting is enabled, "
-                "otherwise limits silently fail open."
+                "REDIS_REQUIRED must be True in production, otherwise rate limits "
+                "silently fail open when Redis is unreachable."
             )
         if self.EMAIL_PROVIDER == "console":
             raise ValueError("EMAIL_PROVIDER must be a real provider in production, not 'console'.")
