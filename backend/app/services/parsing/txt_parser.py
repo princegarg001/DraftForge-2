@@ -1,4 +1,4 @@
-from app.core.exceptions import BaseAppException
+from app.core.exceptions import ValidationFailedError
 from app.services.parsing.base_parser import BaseParser, ParsedDocument, ParsedPage
 from app.utils.text_utils import clean_extracted_text
 
@@ -21,4 +21,6 @@ class TxtParser(BaseParser):
                 metadata={"source_format": "txt"}
             )
         except Exception as exc:
-            raise BaseAppException(status_code=422, detail=f"TXT decoding failed: {str(exc)}") from exc
+            raise ValidationFailedError(
+                "This text file could not be decoded. Save it as UTF-8 and try again."
+            ) from exc

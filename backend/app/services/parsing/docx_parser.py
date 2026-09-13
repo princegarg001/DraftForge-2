@@ -1,6 +1,6 @@
 import io
 import docx
-from app.core.exceptions import BaseAppException
+from app.core.exceptions import ValidationFailedError
 from app.core.logging import get_logger
 from app.services.parsing.base_parser import BaseParser, ParsedDocument, ParsedPage
 from app.utils.text_utils import clean_extracted_text
@@ -32,5 +32,7 @@ class DocxParser(BaseParser):
                 metadata={"paragraphs_count": len(doc.paragraphs), "source_format": "docx"}
             )
         except Exception as exc:
-            logger.error(f"DOCX extraction error on file '{original_filename}': {exc}")
-            raise BaseAppException(status_code=422, detail=f"DOCX parsing failed: {str(exc)}") from exc
+            logger.error(f"DOCX extraction error on file '{original_filename}': {exc.__class__.__name__}: {exc}")
+            raise ValidationFailedError(
+                "This DOCX file could not be read. It may be corrupted or use an unsupported format."
+            ) from exc

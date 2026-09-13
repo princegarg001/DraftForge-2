@@ -1,6 +1,6 @@
 from typing import Optional
 from app.config import get_settings
-from app.core.exceptions import BaseAppException
+from app.core.exceptions import NotFoundError, UpstreamServiceError
 from app.core.logging import get_logger
 from app.db.supabase import get_supabase_admin_client
 
@@ -28,8 +28,10 @@ class SupabaseStorageClient:
             logger.info(f"File uploaded successfully to bucket '{bucket}' at path '{path}'")
             return path
         except Exception as exc:
+            # Bucket names and provider errors describe internal storage
+            # topology and stay out of the response.
             logger.error(f"Failed to upload file to bucket '{bucket}' at '{path}': {exc}")
-            raise BaseAppException(status_code=500, detail=f"Storage upload failed: {str(exc)}") from exc
+            raise UpstreamServiceError("Supabase Storage", str(exc)) from exc
 
     def download_file(self, bucket: str, path: str) -> bytes:
         """
@@ -40,7 +42,7 @@ class SupabaseStorageClient:
             return data
         except Exception as exc:
             logger.error(f"Failed to download file from bucket '{bucket}' at '{path}': {exc}")
-            raise BaseAppException(status_code=404, detail=f"Storage download failed: {str(exc)}") from exc
+            raise NotFoundError("stored file") from exc
 
     def delete_file(self, bucket: str, path: str) -> bool:
         """

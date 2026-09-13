@@ -3,7 +3,10 @@ from pathlib import Path
 import yaml
 from app.ai.evaluation.models import RubricConfig
 from app.core.constants import DocumentType
-from app.core.exceptions import BaseAppException
+from app.core.exceptions import BaseAppException, EvaluationExecutionError
+from app.core.logging import get_logger
+
+logger = get_logger("rubric_loader")
 
 RUBRIC_DIR = Path(__file__).resolve().parent.parent / "knowledge" / "rubrics"
 
@@ -25,11 +28,14 @@ class RubricLoader:
 
         file_path = RUBRIC_DIR / filename
         if not file_path.exists():
-            raise BaseAppException(status_code=500, detail=f"Rubric config missing at {file_path}")
+            # Filesystem paths describe server layout and stay out of the response.
+            logger.error(f"Rubric config missing at {file_path}")
+            raise EvaluationExecutionError(f"missing rubric file for {doc_type}")
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with file_path.open(encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             return RubricConfig(**data)
         except Exception as exc:
-            raise BaseAppException(status_code=500, detail=f"Failed to parse rubric YAML: {exc}") from exc
+            logger.error(f"Failed to parse rubric YAML at {file_path}: {exc}")
+            raise EvaluationExecutionError(f"invalid rubric for {doc_type}") from exc

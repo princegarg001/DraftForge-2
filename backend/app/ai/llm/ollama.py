@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from app.ai.llm.base import BaseLLM, LLMMessage, LLMResponse
 from app.config import get_settings
-from app.core.exceptions import BaseAppException
+from app.core.exceptions import BaseAppException, UpstreamServiceError
 from app.core.logging import get_logger
 
 logger = get_logger("ollama_provider")
@@ -49,5 +49,5 @@ class OllamaLLM(BaseLLM):
                     usage={"total_duration": data.get("total_duration", 0)}
                 )
             except Exception as exc:
-                logger.error(f"Ollama API call failed: {exc}")
-                raise BaseAppException(status_code=502, detail=f"Ollama inference failed: {str(exc)}") from exc
+                logger.error(f"Ollama API call failed: {exc.__class__.__name__}: {exc}")
+                raise UpstreamServiceError("Ollama", exc.__class__.__name__) from exc

@@ -11,6 +11,7 @@ class UserProfileDB(BaseModel):
     email: str
     role: UserRole = UserRole.STUDENT
     full_name: Optional[str] = None
+    is_active: bool = True
     metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[Any] = None
     updated_at: Optional[Any] = None
