@@ -1,0 +1,65 @@
+title = "DraftForge secret-scanning configuration"
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Project-specific detectors for the managed services DraftForge depends on.
+# ---------------------------------------------------------------------------
+
+[[rules]]
+id = "supabase-service-role-key"
+description = "Supabase service-role JWT (grants full database access, bypasses RLS)"
+regex = '''eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]*?(service_role)[A-Za-z0-9_-]*\.[A-Za-z0-9_-]{10,}'''
+tags = ["supabase", "critical"]
+
+[[rules]]
+id = "groq-api-key"
+description = "Groq Cloud API key"
+regex = '''gsk_[A-Za-z0-9]{40,}'''
+tags = ["llm", "groq"]
+
+[[rules]]
+id = "neo4j-aura-connection"
+description = "Neo4j Aura connection URI with embedded credentials"
+regex = '''neo4j\+s://[^\s:]+:[^\s@]+@'''
+tags = ["database", "neo4j"]
+
+[[rules]]
+id = "resend-api-key"
+description = "Resend transactional email API key"
+regex = '''re_[A-Za-z0-9_-]{20,}'''
+tags = ["email", "resend"]
+
+[[rules]]
+id = "qdrant-api-key"
+description = "Qdrant Cloud API key assignment"
+regex = '''(?i)qdrant[_-]?api[_-]?key["'\s:=]+[A-Za-z0-9._-]{30,}'''
+tags = ["database", "qdrant"]
+
+[[rules]]
+id = "grafana-cloud-token"
+description = "Grafana Cloud access policy token"
+regex = '''glc_[A-Za-z0-9+/=]{30,}'''
+tags = ["observability", "grafana"]
+
+# ---------------------------------------------------------------------------
+# Allowlist: template files and documentation are expected to carry
+# placeholder-shaped values.
+# ---------------------------------------------------------------------------
+[allowlist]
+description = "Placeholders in env templates, docs and test fixtures"
+paths = [
+    '''\.env\.example$''',
+    '''^docs/''',
+    '''^README\.md$''',
+    '''^DRAFTFORGE_COMPLETE_TECHNICAL_REPORT\.md$''',
+    '''^backend/tests/''',
+]
+regexes = [
+    '''your[-_]?(project|secret|password|api[-_]?key|db[-_]?id|cluster[-_]?id)''',
+    '''YOUR_[A-Z_]+''',
+    '''eyJhbGciOi\.\.\.''',
+    '''gsk_\.\.\.''',
+    '''(?i)(example|placeholder|changeme|dummy|sample|redacted)''',
+]

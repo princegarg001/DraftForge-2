@@ -1,0 +1,87 @@
+[project]
+name = "draftforge-backend"
+version = "1.0.0"
+description = "Evidence-Grounded Legal Drafting Education and Evaluation Platform API"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["app", "tests"]
+exclude = [".venv", "venv", "__pycache__", "migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "S",      # flake8-bandit
+    "A",      # flake8-builtins
+    "T20",    # flake8-print
+    "RUF",    # ruff-specific
+    "ASYNC",  # flake8-async
+    "SIM",    # flake8-simplify
+    "PTH",    # flake8-use-pathlib
+]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "B008",    # FastAPI depends on function calls in argument defaults
+    "S101",    # assert is legitimate in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S105", "S106", "S311"]
+"scripts/**/*.py" = ["T20", "S105", "S106"]
+"seed_data.py" = ["T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = ["venv", ".venv", "migrations", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["app.core.*", "app.db.*", "app.dependencies"]
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --asyncio-mode=auto --strict-markers"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = [
+    "integration: tests that require live managed-cloud services",
+    "security: tests asserting security controls and authorization boundaries",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = ["app/main.py", "*/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv", "scripts"]
