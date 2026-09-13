@@ -13,6 +13,6 @@ async def get_leaderboard(
     current_user: UserProfileDB = Depends(get_current_user)
 ):
     """
-    Retrieves global student leaderboard rankings based on average drafting scores.
+    Retrieves leaderboard rankings, scoped to the caller's classes.
     """
-    return progress_service.get_leaderboard()
+    return progress_service.get_leaderboard(current_user)

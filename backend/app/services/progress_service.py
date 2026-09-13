@@ -1,5 +1,8 @@
+from app.core.constants import UserRole
+from app.db.repositories.class_repository import EnrollmentRepository
 from app.db.repositories.progress_repository import ProgressRepository
 from app.db.repositories.skill_repository import SkillRepository
+from app.models.database.models import UserProfileDB
 from app.models.schemas.leaderboard import LeaderboardEntry, LeaderboardResponse
 from app.models.schemas.progress import StudentProgressResponse
 
@@ -8,6 +11,7 @@ class ProgressService:
     def __init__(self):
         self.repo = ProgressRepository()
         self.skill_repo = SkillRepository()
+        self.enrollment_repo = EnrollmentRepository()
 
     def get_student_progress(self, user_id: str) -> StudentProgressResponse:
         stats = self.repo.get_student_evaluation_stats(user_id)
@@ -26,6 +30,17 @@ class ProgressService:
             weak_skills_count=weak
         )
 
-    def get_leaderboard(self) -> LeaderboardResponse:
-        entries = self.repo.get_global_leaderboard()
+    def get_leaderboard(self, user: UserProfileDB) -> LeaderboardResponse:
+        """Rank the caller against their classmates only.
+
+        A teacher sees the students they actually teach; a student sees peers
+        from classes they share. Someone enrolled in nothing sees an empty
+        board rather than the whole platform.
+        """
+        if user.role is UserRole.TEACHER:
+            student_ids = self.enrollment_repo.taught_student_ids(user.id)
+        else:
+            student_ids = self.enrollment_repo.classmate_ids(user.id)
+
+        entries = self.repo.get_leaderboard(student_ids)
         return LeaderboardResponse(entries=[LeaderboardEntry(**e) for e in entries])

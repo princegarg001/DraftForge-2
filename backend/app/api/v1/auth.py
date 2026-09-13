@@ -16,10 +16,13 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
 
+from app.core import audit
 from app.core.constants import UserRole
-from app.core.exceptions import AuthenticationError, ConflictError
+from app.core.exceptions import AuthenticationError, ConflictError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.rate_limit import LimitScope, RateLimit
+from app.core.tokens import hash_token, is_expired
+from app.db.repositories.invitation_repository import FacultyCodeRepository
 from app.db.repositories.user_repository import UserRepository
 from app.db.supabase import get_supabase_anon_client
 from app.dependencies import get_current_user
@@ -31,6 +34,7 @@ from app.models.schemas.auth import (
     UserLoginRequest,
     UserRegisterRequest,
 )
+from app.models.schemas.classroom import FacultyRegisterRequest
 
 logger = get_logger("auth_router")
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -108,6 +112,90 @@ async def register(payload: UserRegisterRequest, request: Request) -> AuthTokenR
     access_token, refresh_token, expires_in = _session_payload(auth_response)
     logger.info(f"Registered student {user_id} from {request.client.host if request.client else 'unknown'}")
 
+    return AuthTokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=expires_in,
+        user_id=user_id,
+        email=profile["email"],
+        role=UserRole(profile["role"]),
+        full_name=profile.get("full_name"),
+    )
+
+
+@router.post(
+    "/register-faculty",
+    response_model=AuthTokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[_auth_limit],
+)
+async def register_faculty(payload: FacultyRegisterRequest) -> AuthTokenResponse:
+    """Register an instructor account, gated by an institution-issued code.
+
+    Faculty accounts cannot be self-service. Without this gate the
+    role-escalation hole closed in Phase 1 reopens as an open teacher signup:
+    the role would still not come from the request body, but anyone could
+    obtain one anyway.
+    """
+    code_repo = FacultyCodeRepository()
+    code = code_repo.find_usable(hash_token(payload.registration_code))
+
+    # One generic message for every rejection - wrong code, exhausted code,
+    # expired code - so the endpoint cannot be used to probe which codes exist.
+    invalid = PermissionDeniedError("That registration code is not valid.")
+
+    if not code:
+        logger.warning(f"Faculty registration attempted with an unrecognised code for {payload.email}")
+        raise invalid
+    if code["use_count"] >= code["max_uses"]:
+        raise invalid
+    if code.get("expires_at") and is_expired(code["expires_at"]):
+        raise invalid
+
+    supabase = get_supabase_anon_client()
+    try:
+        auth_response = supabase.auth.sign_up(
+            {
+                "email": payload.email,
+                "password": payload.password,
+                "options": {"data": {"full_name": payload.full_name}},
+            }
+        )
+    except Exception as exc:
+        logger.warning(f"Faculty registration rejected for {payload.email}: {exc.__class__.__name__}")
+        raise ConflictError("Unable to complete registration with the details provided.") from exc
+
+    if not auth_response.user:
+        raise ConflictError("Unable to complete registration with the details provided.")
+
+    user_id = str(auth_response.user.id)
+
+    # TEACHER is assigned here, by the server, only because a valid code was
+    # presented. It is never read from the request.
+    profile = user_repo.ensure_profile(
+        user_id=user_id,
+        email=payload.email,
+        role=UserRole.TEACHER.value,
+        full_name=payload.full_name,
+    )
+    code_repo.consume(code["id"], code["use_count"], code["max_uses"])
+
+    audit.record(
+        action=audit.AuditAction.ROLE_CHANGED,
+        resource="profile",
+        actor_id=user_id,
+        actor_role=UserRole.TEACHER.value,
+        resource_id=user_id,
+        subject_id=user_id,
+        details={"granted_role": "TEACHER", "via": "faculty_registration_code", "code_id": code["id"]},
+    )
+
+    if not auth_response.session:
+        raise AuthenticationError(
+            "Account created. Check your email to confirm your address before signing in."
+        )
+
+    access_token, refresh_token, expires_in = _session_payload(auth_response)
     return AuthTokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,

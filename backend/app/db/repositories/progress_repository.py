@@ -41,12 +41,22 @@ class ProgressRepository:
             "document_type_averages": doc_averages
         }
 
-    def get_global_leaderboard(self, limit: int = 20) -> List[Dict[str, Any]]:
-        # Fetch students and their evaluations
+    def get_leaderboard(self, student_ids: List[str], limit: int = 20) -> List[Dict[str, Any]]:
+        """Rank the given students by mean evaluation score.
+
+        ``student_ids`` is required rather than optional. This previously
+        selected every STUDENT profile in the database, so each student saw the
+        names and scores of every other student on the platform - including
+        those at other institutions.
+        """
+        if not student_ids:
+            return []
+
         res = (
             self.client.table("profiles")
             .select("id, full_name, role, drafts(draft_versions(evaluations(overall_score)))")
             .eq("role", "STUDENT")
+            .in_("id", student_ids)
             .execute()
         )
         students = res.data or []

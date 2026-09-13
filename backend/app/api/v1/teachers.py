@@ -27,6 +27,7 @@ async def get_cohort_analytics(
     current_user: UserProfileDB = Depends(get_current_user)
 ):
     """
-    Retrieves class-wide performance metrics, average scores, and weak-skill distributions.
+    Retrieves performance metrics, average scores, and weak-skill distributions
+    across the classes this teacher runs.
     """
-    return analytics_service.get_cohort_analytics()
+    return analytics_service.get_cohort_analytics(current_user)
