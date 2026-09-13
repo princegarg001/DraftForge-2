@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from app.dependencies import get_current_user, require_student, require_teacher
 from app.models.database.models import UserProfileDB
 from app.models.schemas.submission import (
@@ -39,6 +39,7 @@ async def get_assignment_submissions(
 async def override_submission_score(
     submission_id: str,
     payload: ScoreOverrideRequest,
+    request: Request,
     current_user: UserProfileDB = Depends(get_current_user)
 ):
     """
@@ -47,5 +48,6 @@ async def override_submission_score(
     return submission_service.override_submission_score(
         submission_id=submission_id,
         teacher_id=current_user.id,
-        payload=payload
+        payload=payload,
+        request=request,
     )

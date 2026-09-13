@@ -1,4 +1,6 @@
 from typing import List
+from fastapi import Request
+from app.core import audit
 from app.core.authorization import assert_owns_assignment
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.db.repositories.assignment_repository import AssignmentRepository
@@ -77,7 +79,8 @@ class SubmissionService:
         self,
         submission_id: str,
         teacher_id: str,
-        payload: ScoreOverrideRequest
+        payload: ScoreOverrideRequest,
+        request: Request | None = None,
     ) -> SubmissionResponse:
         submission = self.sub_repo.get_by_id(submission_id)
         if not submission:
@@ -102,6 +105,21 @@ class SubmissionService:
             submission_id=submission_id,
             final_score=payload.overridden_score,
             teacher_notes=payload.teacher_notes
+        )
+
+        audit.record(
+            action=audit.AuditAction.GRADE_OVERRIDDEN,
+            resource="submission",
+            actor_id=teacher_id,
+            actor_role="TEACHER",
+            resource_id=submission_id,
+            subject_id=submission["student_id"],
+            details={
+                "previous_score": submission.get("final_score"),
+                "new_score": payload.overridden_score,
+                "reason": payload.override_reason,
+            },
+            request=request,
         )
 
         return self._format_submission(updated_sub)

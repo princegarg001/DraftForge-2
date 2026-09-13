@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import UploadFile
 from app.core.constants import DocumentType
 from app.core.exceptions import NotFoundError, PermissionDeniedError
-from app.core.file_security import validate_uploaded_file
+from app.core.file_security import sanitize_filename, validate_uploaded_file
 from app.db.repositories.draft_repository import DraftRepository
 from app.models.schemas.draft import DraftCreateRequest, DraftResponse, DraftVersionResponse, VersionCompareResponse
 from app.services.parsing.classifier import DocumentClassifier
@@ -42,18 +42,21 @@ class DraftService:
 
     async def create_draft_from_file(self, user_id: str, file: UploadFile, title: Optional[str] = None) -> DraftResponse:
         content = await file.read()
-        validate_uploaded_file(file, content)
+        # Returns the type established from the file's own bytes; the
+        # client-declared content_type and filename are not trusted downstream.
+        verified_type = validate_uploaded_file(file, content)
+        safe_filename = sanitize_filename(file.filename or "upload")
 
         file_hash = compute_sha256(content)
-        parser = ParserFactory.get_parser_for_file(file.filename)
-        parsed_doc = parser.parse(content, file.filename)
+        parser = ParserFactory.get_parser_for_file(safe_filename)
+        parsed_doc = parser.parse(content, safe_filename)
 
         doc_type, _ = DocumentClassifier.classify(parsed_doc.raw_text)
 
         draft_record = self.repo.create({
             "user_id": user_id,
             "document_type": doc_type.value,
-            "title": title or file.filename,
+            "title": title or safe_filename,
             "status": "DRAFT",
         })
 
@@ -61,9 +64,9 @@ class DraftService:
             user_id=user_id,
             draft_id=draft_record["id"],
             version=1,
-            filename=file.filename,
+            filename=safe_filename,
             content=content,
-            content_type=file.content_type or "application/octet-stream"
+            content_type=verified_type,
         )
 
         version_record = self.repo.create_version(
