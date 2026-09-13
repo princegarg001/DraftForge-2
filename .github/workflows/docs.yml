@@ -44,6 +44,12 @@ jobs:
       - name: Build
         # The build fails on dead links, which is the check that keeps the
         # docs honest as pages are renamed. Only localhost URLs are exempt.
+        #
+        # A project Pages site is served under /<repo-name>/, not the domain
+        # root. Without this base every asset URL 404s and the site renders
+        # unstyled. Derived from the repo name so forks deploy correctly too.
+        env:
+          DOCS_BASE: /${{ github.event.repository.name }}/
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
