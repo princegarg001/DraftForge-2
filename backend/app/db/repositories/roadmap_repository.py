@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.db.repositories.base_repository import BaseRepository
 
 
@@ -40,8 +41,38 @@ class RoadmapRepository(BaseRepository):
         res = self.client.table("roadmap_items").insert(payload).execute()
         return res.data[0] if res.data else {}
 
-    def mark_item_completed(self, item_id: str) -> Dict[str, Any]:
+    def get_item_owner(self, item_id: str) -> Optional[str]:
+        """Return the id of the student who owns ``item_id``, if it exists."""
+        res = (
+            self.client.table("roadmap_items")
+            .select("id, roadmaps!inner(user_id)")
+            .eq("id", item_id)
+            .limit(1)
+            .execute()
+        )
+        if not res.data:
+            return None
+        roadmap = res.data[0].get("roadmaps") or {}
+        if isinstance(roadmap, list):
+            roadmap = roadmap[0] if roadmap else {}
+        return roadmap.get("user_id")
+
+    def mark_item_completed(self, item_id: str, user_id: str) -> Dict[str, Any]:
+        """Mark a milestone complete, scoped to its owner.
+
+        ``user_id`` is required rather than optional: roadmap_items carries no
+        user column of its own, so without an explicit join through roadmaps
+        this update matches on a bare id and any authenticated student can
+        complete another student's milestones.
+        """
         from datetime import datetime, timezone
+
+        owner_id = self.get_item_owner(item_id)
+        if owner_id is None:
+            raise NotFoundError("roadmap item", item_id)
+        if owner_id != user_id:
+            raise PermissionDeniedError("You do not have permission to modify this roadmap item.")
+
         payload = {
             "is_completed": True,
             "completed_at": datetime.now(timezone.utc).isoformat(),

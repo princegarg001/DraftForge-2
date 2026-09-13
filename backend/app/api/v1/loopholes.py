@@ -17,4 +17,6 @@ async def get_loophole_analysis(
     Executes graph-traversal reasoning over Neo4j Aura to detect clause dependency gaps,
     unmitigated risks, and structural loopholes for a completed evaluation.
     """
-    return loophole_service.analyze_evaluation_loopholes(evaluation_id=evaluation_id)
+    return loophole_service.analyze_evaluation_loopholes(
+        evaluation_id=evaluation_id, requester=current_user
+    )

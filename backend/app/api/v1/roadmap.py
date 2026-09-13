@@ -1,5 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, status
+from app.core.rate_limit import LimitScope, RateLimit
 from app.dependencies import get_current_user, require_student
 from app.models.database.models import UserProfileDB
 from app.models.schemas.roadmap import RoadmapItemResponse, RoadmapResponse
@@ -19,7 +20,12 @@ async def get_active_roadmap(
     return roadmap_service.get_active_roadmap(user_id=current_user.id)
 
 
-@router.post("/generate", response_model=RoadmapResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_student)])
+@router.post(
+    "/generate",
+    response_model=RoadmapResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_student), Depends(RateLimit(LimitScope.LLM))],
+)
 async def generate_new_roadmap(
     current_user: UserProfileDB = Depends(get_current_user)
 ):
@@ -37,4 +43,4 @@ async def complete_roadmap_item(
     """
     Marks a milestone item within a learning roadmap as completed.
     """
-    return roadmap_service.complete_item(item_id=item_id)
+    return roadmap_service.complete_item(item_id=item_id, user_id=current_user.id)

@@ -1,6 +1,8 @@
 from app.ai.evaluation.models import EvaluationFinding
+from app.core.authorization import assert_can_access_evaluation
 from app.core.constants import DocumentType, FindingCategory, FindingStatus
 from app.core.exceptions import NotFoundError
+from app.models.database.models import UserProfileDB
 from app.db.repositories.draft_repository import DraftRepository
 from app.db.repositories.evaluation_repository import EvaluationRepository
 from app.models.schemas.loophole import LoopholeAnalysisResponse, LoopholeFindingResponse
@@ -13,7 +15,13 @@ class LoopholeService:
         self.draft_repo = DraftRepository()
         self.pipeline = LoopholePipeline()
 
-    def analyze_evaluation_loopholes(self, evaluation_id: str) -> LoopholeAnalysisResponse:
+    def analyze_evaluation_loopholes(
+        self, evaluation_id: str, requester: UserProfileDB
+    ) -> LoopholeAnalysisResponse:
+        # Same exposure as get_evaluation: this walks to the underlying draft
+        # and returns findings derived from its contents.
+        assert_can_access_evaluation(evaluation_id, requester)
+
         evaluation = self.eval_repo.get_with_evidence(evaluation_id)
         if not evaluation:
             raise NotFoundError("Evaluation", evaluation_id)

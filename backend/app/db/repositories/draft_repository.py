@@ -52,6 +52,23 @@ class DraftRepository(BaseRepository):
             return res.data[0]
         return None
 
+    def get_version_by_id(self, version_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch a draft version by its own id.
+
+        Callers must check the returned ``draft_id`` against a draft they have
+        already confirmed the user owns - this lookup is unscoped on its own.
+        """
+        res = (
+            self.client.table("draft_versions")
+            .select("*")
+            .eq("id", version_id)
+            .limit(1)
+            .execute()
+        )
+        if res.data:
+            return res.data[0]
+        return None
+
     def get_version_by_number(self, draft_id: str, version_number: int) -> Optional[Dict[str, Any]]:
         res = (
             self.client.table("draft_versions")

@@ -1,6 +1,8 @@
 from typing import List
+from app.core.authorization import assert_owns_assignment
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.db.repositories.assignment_repository import AssignmentRepository
+from app.db.repositories.draft_repository import DraftRepository
 from app.db.repositories.evaluation_repository import EvaluationRepository
 from app.db.repositories.submission_repository import SubmissionRepository
 from app.models.schemas.evaluation import EvaluationFindingResponse, EvaluationResponse
@@ -17,12 +19,26 @@ class SubmissionService:
         self.sub_repo = SubmissionRepository()
         self.assign_repo = AssignmentRepository()
         self.eval_repo = EvaluationRepository()
+        self.draft_repo = DraftRepository()
         self.eval_service = EvaluationService()
 
     def submit_assignment(self, student_id: str, payload: CreateSubmissionRequest) -> SubmissionResponse:
         assignment = self.assign_repo.get_by_id(payload.assignment_id)
         if not assignment:
             raise NotFoundError("Assignment", payload.assignment_id)
+
+        # The draft id arrives from the client and was previously taken on
+        # trust, so a student could submit another student's draft - and link
+        # that student's evaluation - as their own work.
+        draft = self.draft_repo.get_by_id(payload.draft_id)
+        if not draft or draft.get("user_id") != student_id:
+            raise NotFoundError("Draft", payload.draft_id)
+
+        # The version must belong to that same draft, or an arbitrary version
+        # id could still be attached to a legitimately owned draft.
+        version = self.draft_repo.get_version_by_id(payload.draft_version_id)
+        if not version or version.get("draft_id") != payload.draft_id:
+            raise NotFoundError("DraftVersion", payload.draft_version_id)
 
         # 1. Trigger or link deterministic evaluation
         existing_eval = self.eval_repo.get_by_draft_version(payload.draft_version_id)
@@ -66,6 +82,12 @@ class SubmissionService:
         submission = self.sub_repo.get_by_id(submission_id)
         if not submission:
             raise NotFoundError("Submission", submission_id)
+
+        # Role alone was the only gate here, so any authenticated teacher could
+        # rewrite the grade on any submission in the system, including another
+        # instructor's cohort.
+        assignment = self.assign_repo.get_by_id(submission["assignment_id"])
+        assert_owns_assignment(assignment, teacher_id, submission["assignment_id"])
 
         eval_id = submission.get("evaluation_id")
         if eval_id:

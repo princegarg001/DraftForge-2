@@ -31,4 +31,4 @@ async def get_evaluation_details(
     """
     Retrieves full evaluation report including traceable evidence and reference citations.
     """
-    return eval_service.get_evaluation(evaluation_id=evaluation_id)
+    return eval_service.get_evaluation(evaluation_id=evaluation_id, requester=current_user)

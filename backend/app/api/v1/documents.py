@@ -1,6 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from app.core.constants import DocumentType
+from app.core.rate_limit import LimitScope, RateLimit
 from app.dependencies import get_current_user, require_teacher
 from app.models.database.models import UserProfileDB
 from app.models.schemas.document import DocumentClassificationResult, ReferenceDocumentResponse
@@ -14,7 +15,7 @@ doc_service = DocumentService()
     "/reference/upload",
     response_model=ReferenceDocumentResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_teacher)]
+    dependencies=[Depends(require_teacher), Depends(RateLimit(LimitScope.UPLOAD))],
 )
 async def upload_reference_document(
     file: UploadFile = File(...),
@@ -44,9 +45,16 @@ async def list_reference_documents(
     return doc_service.list_reference_documents(doc_type=document_type)
 
 
-@router.post("/classify", response_model=DocumentClassificationResult)
+@router.post(
+    "/classify",
+    response_model=DocumentClassificationResult,
+    # Was fully unauthenticated and accepted arbitrary text, giving anyone an
+    # unbounded compute endpoint. Now authenticated and rate limited.
+    dependencies=[Depends(RateLimit(LimitScope.DEFAULT))],
+)
 async def classify_raw_text(
-    text: str = Form(...),
+    text: str = Form(..., max_length=200_000),
+    current_user: UserProfileDB = Depends(get_current_user),
 ):
     """
     Run rule-based classification against legal text.

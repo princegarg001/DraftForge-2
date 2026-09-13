@@ -1,10 +1,12 @@
 from app.ai.evaluation.evaluator import EvaluationEngine
 from app.ai.evaluation.models import EvaluationFinding
+from app.core.authorization import assert_can_access_evaluation
 from app.core.constants import DocumentType, FindingCategory, FindingStatus
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.db.repositories.draft_repository import DraftRepository
 from app.db.repositories.evaluation_repository import EvaluationRepository
 from app.db.repositories.evidence_repository import EvidenceRepository
+from app.models.database.models import UserProfileDB
 from app.models.schemas.evaluation import EvaluationFindingResponse, EvaluationResponse
 from app.pipelines.skill_pipeline import SkillPipeline
 
@@ -91,7 +93,12 @@ class EvaluationService:
             evidence_items=evidence_items,
         )
 
-    def get_evaluation(self, evaluation_id: str) -> EvaluationResponse:
+    def get_evaluation(self, evaluation_id: str, requester: UserProfileDB) -> EvaluationResponse:
+        # Authorize before reading: the record contains the student's scores and
+        # verbatim draft evidence, so a bare id lookup leaks coursework across
+        # the whole cohort.
+        assert_can_access_evaluation(evaluation_id, requester)
+
         record = self.eval_repo.get_with_evidence(evaluation_id)
         if not record:
             raise NotFoundError("Evaluation", evaluation_id)

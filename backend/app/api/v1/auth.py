@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, Request, status
 from app.core.constants import UserRole
 from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.logging import get_logger
+from app.core.rate_limit import LimitScope, RateLimit
 from app.db.repositories.user_repository import UserRepository
 from app.db.supabase import get_supabase_anon_client
 from app.dependencies import get_current_user
@@ -35,6 +36,10 @@ logger = get_logger("auth_router")
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 user_repo = UserRepository()
 
+# Credential endpoints are throttled per IP. Without this, password guessing
+# and account enumeration are bounded only by network speed.
+_auth_limit = Depends(RateLimit(LimitScope.AUTH))
+
 # Returned for every failed credential check so that a wrong password and an
 # unknown account are indistinguishable.
 _GENERIC_AUTH_FAILURE = "Invalid email or password."
@@ -49,7 +54,12 @@ def _session_payload(auth_response: Any) -> tuple[str, str | None, int | None]:
     )
 
 
-@router.post("/register", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=AuthTokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[_auth_limit],
+)
 async def register(payload: UserRegisterRequest, request: Request) -> AuthTokenResponse:
     """Register a student account.
 
@@ -109,7 +119,7 @@ async def register(payload: UserRegisterRequest, request: Request) -> AuthTokenR
     )
 
 
-@router.post("/login", response_model=AuthTokenResponse)
+@router.post("/login", response_model=AuthTokenResponse, dependencies=[_auth_limit])
 async def login(payload: UserLoginRequest) -> AuthTokenResponse:
     supabase = get_supabase_anon_client()
 
@@ -153,7 +163,7 @@ async def login(payload: UserLoginRequest) -> AuthTokenResponse:
     )
 
 
-@router.post("/refresh", response_model=AuthTokenResponse)
+@router.post("/refresh", response_model=AuthTokenResponse, dependencies=[_auth_limit])
 async def refresh_session(payload: RefreshTokenRequest) -> AuthTokenResponse:
     """Exchange a refresh token for a new access token.
 

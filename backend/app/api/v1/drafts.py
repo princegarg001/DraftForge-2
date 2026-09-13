@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from app.core.rate_limit import LimitScope, RateLimit
 from app.dependencies import get_current_user, require_student
 from app.models.database.models import UserProfileDB
 from app.models.schemas.draft import DraftCreateRequest, DraftResponse, DraftVersionResponse, VersionCompareResponse
@@ -20,7 +21,12 @@ async def create_draft(
     return draft_service.create_draft(user_id=current_user.id, payload=payload)
 
 
-@router.post("/upload", response_model=DraftResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_student)])
+@router.post(
+    "/upload",
+    response_model=DraftResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_student), Depends(RateLimit(LimitScope.UPLOAD))],
+)
 async def upload_draft_file(
     file: UploadFile = File(...),
     title: str = Form(None),

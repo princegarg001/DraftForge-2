@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from app.core.rate_limit import LimitScope, RateLimit
 from app.dependencies import get_current_user
 from app.models.database.models import UserProfileDB
 from app.models.schemas.chat import ChatMessageRequest, ChatTurnResponse
@@ -8,7 +9,13 @@ router = APIRouter(prefix="/chat", tags=["Multi-Tier Memory Chat"])
 chat_service = ChatService()
 
 
-@router.post("/send", response_model=ChatTurnResponse)
+@router.post(
+    "/send",
+    response_model=ChatTurnResponse,
+    # Each call reaches Groq, so an unthrottled loop here is an unbounded
+    # inference bill.
+    dependencies=[Depends(RateLimit(LimitScope.LLM))],
+)
 async def send_chat_message(
     payload: ChatMessageRequest,
     current_user: UserProfileDB = Depends(get_current_user)

@@ -38,6 +38,6 @@ class RoadmapService:
             roadmap_items=items
         )
 
-    def complete_item(self, item_id: str) -> RoadmapItemResponse:
-        res = self.repo.mark_item_completed(item_id)
+    def complete_item(self, item_id: str, user_id: str) -> RoadmapItemResponse:
+        res = self.repo.mark_item_completed(item_id, user_id)
         return RoadmapItemResponse(**res)

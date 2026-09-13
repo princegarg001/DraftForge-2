@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.ai.rag.context.context_builder import ContextBuilder
 from app.ai.rag.pipeline import RAGPipeline
+from app.core.rate_limit import LimitScope, RateLimit
 from app.dependencies import get_current_user
 from app.models.database.models import UserProfileDB
 from app.models.schemas.rag import EvidenceChunkSchema, RAGQueryRequest, RAGQueryResponse
@@ -9,7 +10,13 @@ router = APIRouter(prefix="/rag", tags=["RAG & Evidence Retrieval"])
 rag_pipeline = RAGPipeline()
 
 
-@router.post("/retrieve", response_model=RAGQueryResponse)
+@router.post(
+    "/retrieve",
+    response_model=RAGQueryResponse,
+    # Embedding plus a vector search per call; cheaper than inference but still
+    # worth bounding.
+    dependencies=[Depends(RateLimit(LimitScope.LLM))],
+)
 async def query_reference_evidence(
     payload: RAGQueryRequest,
     current_user: UserProfileDB = Depends(get_current_user)
