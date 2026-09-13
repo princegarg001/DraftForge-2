@@ -1,0 +1,198 @@
+{
+  "uid": "draftforge-llm-cost",
+  "title": "DraftForge · LLM Cost & Performance",
+  "description": "Token spend and inference latency. Request counts cannot bound cost here, because one long-context call may cost a hundred times another.",
+  "tags": ["draftforge", "llm", "cost"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "prometheus" }
+      },
+      {
+        "name": "price_per_million",
+        "type": "constant",
+        "label": "Blended USD per 1M tokens",
+        "description": "Set to your provider's blended rate to turn token counts into a cost estimate.",
+        "query": "0.30",
+        "current": { "text": "0.30", "value": "0.30" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Spend",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Tokens (24h)",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 1, "color": { "mode": "fixed", "fixedColor": "purple" } }
+      },
+      "targets": [
+        { "expr": "sum(increase(draftforge_llm_tokens_total[24h]))", "refId": "A", "legendFormat": "tokens" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Estimated cost (24h)",
+      "description": "Tokens × the blended rate set in the dashboard variable. An estimate, not an invoice.",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD", "decimals": 2, "color": { "mode": "fixed", "fixedColor": "green" } }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(draftforge_llm_tokens_total[24h])) / 1000000 * $price_per_million",
+          "refId": "A",
+          "legendFormat": "usd"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Burn rate",
+      "description": "Projected tokens per hour at the current rate. Alerts above 500k/h.",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 250000 },
+              { "color": "red", "value": 500000 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [
+        { "expr": "sum(rate(draftforge_llm_tokens_total[15m])) * 3600", "refId": "A", "legendFormat": "tokens/hr" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "LLM failure rate",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.05 },
+              { "color": "red", "value": 0.2 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(draftforge_llm_calls_total{llm_success=\"false\"}[10m])) / clamp_min(sum(rate(draftforge_llm_calls_total[10m])), 0.001)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Breakdown",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Token rate by operation",
+      "description": "Which feature is consuming the budget. Prompt and completion are separated because prompt growth usually means context bloat, not more usage.",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "stacking": { "mode": "normal" }, "showPoints": "never" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(draftforge_llm_tokens_total[5m])) by (llm_operation, llm_token_kind)",
+          "legendFormat": "{{llm_operation}} · {{llm_token_kind}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Inference latency by model",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(draftforge_llm_duration_bucket[5m])) by (le, llm_model))",
+          "legendFormat": "p95 · {{llm_model}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(draftforge_llm_duration_bucket[5m])) by (le, llm_model))",
+          "legendFormat": "p50 · {{llm_model}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Token share by operation (24h)",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["percent"] } },
+      "targets": [
+        {
+          "expr": "sum(increase(draftforge_llm_tokens_total[24h])) by (llm_operation)",
+          "legendFormat": "{{llm_operation}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Call volume by operation",
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 15 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(draftforge_llm_calls_total[5m])) by (llm_operation)",
+          "legendFormat": "{{llm_operation}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

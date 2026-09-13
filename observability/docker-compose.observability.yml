@@ -1,0 +1,123 @@
+# Local LGTM stack: Grafana + Loki (logs) + Tempo (traces) + Prometheus (metrics).
+#
+#   docker compose -f observability/docker-compose.observability.yml up -d
+#
+# Then point the API at the collector:
+#   OTEL_ENABLED=True
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+#   LOG_FORMAT=json
+#
+# Grafana is on http://localhost:3001 with anonymous admin access - this file
+# is for a developer laptop and must never be used as a deployment template.
+# Production ships to Grafana Cloud, provisioned by Terraform.
+
+name: draftforge-observability
+
+services:
+  # ---------------------------------------------------------------------------
+  # Collector - the single OTLP endpoint the app talks to. Routing traces and
+  # metrics to different backends stays a collector concern, so the app needs
+  # to know about exactly one address.
+  # ---------------------------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.107.0
+    container_name: draftforge-otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    depends_on:
+      - tempo
+      - prometheus
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Tempo - traces
+  # ---------------------------------------------------------------------------
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: draftforge-tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Loki - logs. The API emits single-line JSON carrying trace_id, which is
+  # what makes a log line clickable through to its trace.
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: draftforge-loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Prometheus - metrics, scraped from the collector
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: draftforge-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Grafana - dashboards, provisioned from ./dashboards so they are version
+  # controlled rather than clicked together and lost on the next container
+  # rebuild.
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: draftforge-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redis - rate limiting and token budgets, so the limiter can be exercised
+  # locally rather than silently failing open.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.4-alpine
+    container_name: draftforge-redis
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  tempo-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:

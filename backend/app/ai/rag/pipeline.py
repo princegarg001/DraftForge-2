@@ -1,3 +1,4 @@
+import time
 from typing import Any, Dict, List
 from qdrant_client.http import models as qmodels
 from app.ai.embeddings.embedding_service import EmbeddingService
@@ -8,6 +9,7 @@ from app.config import get_settings
 from app.core.constants import DocumentType
 from app.core.logging import get_logger
 from app.db.qdrant import get_qdrant_client
+from app.observability import record_retrieval, set_attributes, span
 from app.services.parsing.base_parser import ParsedDocument
 
 logger = get_logger("rag_pipeline")
@@ -72,9 +74,41 @@ class RAGPipeline:
         section_hint: str = None,
         top_k: int = 4
     ) -> List[Dict[str, Any]]:
-        return self.retriever.retrieve(
-            query=query,
-            document_type=document_type,
-            section_hint=section_hint,
-            top_k=top_k
-        )
+        started = time.perf_counter()
+
+        with span(
+            "rag.retrieve",
+            **{
+                "rag.document_type": document_type.value,
+                "rag.top_k": top_k,
+                # Length only. The query is student-authored text and may quote
+                # their draft, so it does not belong in a trace attribute.
+                "rag.query_length": len(query),
+                "rag.has_section_hint": bool(section_hint),
+            },
+        ):
+            results = self.retriever.retrieve(
+                query=query,
+                document_type=document_type,
+                section_hint=section_hint,
+                top_k=top_k
+            )
+
+            # A falling top score is the earliest signal that retrieval quality
+            # has regressed - visible here well before anyone reports a poor
+            # answer from the tutor.
+            top_score = None
+            if results:
+                scores = [float(r["score"]) for r in results if r.get("score") is not None]
+                top_score = max(scores) if scores else None
+
+            set_attributes(**{"rag.result_count": len(results), "rag.top_score": top_score})
+            record_retrieval(
+                stage="hybrid",
+                document_type=document_type.value,
+                duration_seconds=time.perf_counter() - started,
+                result_count=len(results),
+                top_score=top_score,
+            )
+
+        return results

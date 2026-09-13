@@ -29,6 +29,7 @@ from app.config import get_settings
 from app.core.exceptions import QuotaExceededError, RateLimitExceededError
 from app.core.logging import get_logger
 from app.core.redis_client import get_redis
+from app.observability import record_rate_limit
 
 logger = get_logger("rate_limit")
 settings = get_settings()
@@ -170,6 +171,7 @@ async def check_rate_limit(identity: str, scope: LimitScope) -> LimitResult:
 
             if not allowed:
                 logger.warning(f"Rate limit hit: identity={identity} scope={scope.value} rule={rule.label}")
+                record_rate_limit(scope=scope.value, allowed=False)
                 return LimitResult(False, limit, 0, max(1, retry_after))
             if remaining < tightest.remaining:
                 tightest = LimitResult(True, limit, remaining, 0)

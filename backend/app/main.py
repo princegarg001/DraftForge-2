@@ -19,6 +19,7 @@ from app.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.observability import setup_observability, shutdown_observability
 
 settings = get_settings()
 logger = get_logger("main_app")
@@ -71,6 +72,10 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down...")
     close_neo4j_driver()
     await close_redis()
+    # Flush buffered spans and metrics. Without this the batch processor's
+    # buffer is lost on exit, reliably dropping telemetry for whatever was
+    # happening when the process went down - the exact window worth seeing.
+    shutdown_observability()
 
 
 app = FastAPI(
@@ -115,6 +120,11 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
 
 register_exception_handlers(app)
 app.include_router(api_v1_router)
+
+# Installed after the routes so FastAPI instrumentation sees the full route
+# table and can label spans with their path template rather than the raw URL -
+# otherwise every draft id becomes its own metric dimension.
+setup_observability(app)
 
 
 @app.get("/", tags=["System"])

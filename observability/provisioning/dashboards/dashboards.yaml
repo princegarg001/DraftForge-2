@@ -1,0 +1,16 @@
+apiVersion: 1
+
+providers:
+  - name: DraftForge
+    orgId: 1
+    folder: DraftForge
+    type: file
+    disableDeletion: false
+    # Dashboards are version controlled under ./dashboards. Editing in the UI
+    # is fine for exploration, but anything worth keeping is exported back to
+    # a file - otherwise it is lost on the next container rebuild.
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

@@ -1,0 +1,141 @@
+# Alert rules.
+#
+# Each alert names a condition someone must act on. Rules that fire on
+# conditions nobody acts on train people to ignore the channel, so the set is
+# deliberately small.
+
+groups:
+  # ---------------------------------------------------------------------------
+  - name: draftforge-availability
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m]))
+            /
+          sum(rate(traces_spanmetrics_calls_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Over 5% of requests are failing"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: LatencyRegression
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(traces_spanmetrics_latency_bucket[5m])) by (le, span_name)
+          ) > 5000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 latency above 5s on {{ $labels.span_name }}"
+          description: "p95 is {{ $value | humanizeDuration }}."
+
+  # ---------------------------------------------------------------------------
+  # Spend. These are the alerts that exist because the LLM endpoints were
+  # previously unmetered and unbounded.
+  # ---------------------------------------------------------------------------
+  - name: draftforge-cost
+    interval: 1m
+    rules:
+      - alert: LLMTokenBurnRateHigh
+        expr: sum(rate(draftforge_llm_tokens_total[15m])) * 3600 > 500000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM token burn exceeds 500k/hour"
+          description: >
+            Projected {{ $value | humanize }} tokens/hour. Check for a runaway
+            client or an ineffective rate limit before the bill lands.
+
+      - alert: LLMErrorRateHigh
+        expr: |
+          sum(rate(draftforge_llm_calls_total{llm_success="false"}[10m]))
+            /
+          clamp_min(sum(rate(draftforge_llm_calls_total[10m])), 0.001) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 20% of LLM calls are failing"
+          description: "Likely provider trouble, an exhausted quota, or an invalid key."
+
+  # ---------------------------------------------------------------------------
+  # Retrieval quality degrades silently - nothing errors, answers just get
+  # worse. These are the only signals that catch it before a user complains.
+  # ---------------------------------------------------------------------------
+  - name: draftforge-quality
+    interval: 1m
+    rules:
+      - alert: RetrievalScoreDegraded
+        expr: |
+          histogram_quantile(0.5, sum(rate(draftforge_rag_top_score_bucket[30m])) by (le)) < 0.45
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Median top retrieval score has fallen below 0.45"
+          description: >
+            Retrieval quality has regressed. Check that the reference corpus is
+            still indexed and the embedding model has not changed.
+
+      - alert: RetrievalReturningNothing
+        expr: |
+          histogram_quantile(0.9, sum(rate(draftforge_rag_results_bucket[15m])) by (le)) < 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Retrieval is returning no results"
+          description: "The Qdrant collection may be empty, unreachable, or misfiltered."
+
+  # ---------------------------------------------------------------------------
+  - name: draftforge-security
+    interval: 1m
+    rules:
+      - alert: AuthFailureSpike
+        expr: sum(rate(draftforge_auth_events_total{auth_success="false"}[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated authentication failures"
+          description: >
+            {{ $value | humanize }} failures/sec. Consistent with credential
+            stuffing; check source addresses and whether auth rate limits hold.
+
+      - alert: RateLimitSaturation
+        expr: |
+          sum(rate(draftforge_rate_limit_decisions_total{rate_limit_allowed="false"}[10m]))
+            /
+          clamp_min(sum(rate(draftforge_rate_limit_decisions_total[10m])), 0.001) > 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 30% of requests are being rate limited"
+          description: >
+            Either an abusive client, or limits set too tight for normal
+            classroom use. Check the split by scope before loosening anything.
+
+  # ---------------------------------------------------------------------------
+  - name: draftforge-delivery
+    interval: 1m
+    rules:
+      - alert: InvitationEmailsFailing
+        expr: |
+          sum(rate(draftforge_emails_total{email_status=~"FAILED|BOUNCED"}[15m]))
+            /
+          clamp_min(sum(rate(draftforge_emails_total[15m])), 0.001) > 0.1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Over 10% of invitation emails are not being delivered"
+          description: >
+            Students cannot join without their invitation. Check the sending
+            domain's verification and reputation.
