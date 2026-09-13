@@ -1,0 +1,162 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Verify CI passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check required workflows
+        # Deploying a commit whose tests never ran defeats the point of having
+        # them. This fails closed if CI has not reported success for this SHA.
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const required = ['CI · Backend', 'CI · Frontend'];
+            const { data } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+            });
+            const failed = [];
+            for (const name of required) {
+              const runs = data.check_runs.filter(c => c.name.startsWith(name.split(' · ')[0]));
+              if (!runs.length) { failed.push(`${name}: no run found`); continue; }
+              const bad = runs.find(r => r.conclusion && !['success', 'skipped', 'neutral'].includes(r.conclusion));
+              if (bad) failed.push(`${name}: ${bad.conclusion}`);
+            }
+            if (failed.length) {
+              core.setFailed(`Refusing to deploy:\n${failed.join('\n')}`);
+            }
+
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'staging' }}
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    outputs:
+      api_url: ${{ steps.target.outputs.api_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target
+        id: target
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            echo "service_id=${{ secrets.RENDER_PROD_BACKEND_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
+            echo "static_id=${{ secrets.RENDER_PROD_FRONTEND_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
+            echo "api_url=${{ secrets.PROD_API_URL }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "service_id=${{ secrets.RENDER_STAGING_BACKEND_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
+            echo "static_id=${{ secrets.RENDER_STAGING_FRONTEND_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
+            echo "api_url=${{ secrets.STAGING_API_URL }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger backend deploy
+        id: backend
+        run: |
+          RESPONSE=$(curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache":"do_not_clear"}' \
+            "https://api.render.com/v1/services/${{ steps.target.outputs.service_id }}/deploys")
+          DEPLOY_ID=$(echo "$RESPONSE" | jq -r '.id')
+          if [ -z "$DEPLOY_ID" ] || [ "$DEPLOY_ID" = "null" ]; then
+            echo "::error::Render did not return a deploy id."
+            exit 1
+          fi
+          echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the deploy to go live
+        run: |
+          for attempt in $(seq 1 60); do
+            STATUS=$(curl -sS \
+              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+              "https://api.render.com/v1/services/${{ steps.target.outputs.service_id }}/deploys/${{ steps.backend.outputs.deploy_id }}" \
+              | jq -r '.status')
+            echo "[$attempt/60] status=$STATUS"
+            case "$STATUS" in
+              live) echo "Deploy is live."; exit 0 ;;
+              build_failed|update_failed|canceled|deactivated)
+                echo "::error::Deploy finished as $STATUS"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::Timed out waiting for the deploy to go live."
+          exit 1
+
+      - name: Trigger frontend deploy
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache":"clear"}' \
+            "https://api.render.com/v1/services/${{ steps.target.outputs.static_id }}/deploys" > /dev/null
+
+  smoke:
+    name: Smoke tests
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Liveness
+        run: |
+          API="${{ needs.deploy.outputs.api_url }}"
+          for attempt in $(seq 1 20); do
+            CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$API/health" || true)
+            [ "$CODE" = "200" ] && { echo "Health check passed."; break; }
+            echo "[$attempt/20] health returned $CODE"
+            sleep 10
+            [ "$attempt" = "20" ] && { echo "::error::Service never became healthy."; exit 1; }
+          done
+
+      - name: Security headers are present
+        # These were added in Phase 1c. A deploy that silently drops them
+        # should not be considered successful.
+        run: |
+          API="${{ needs.deploy.outputs.api_url }}"
+          HEADERS=$(curl -sSI "$API/health")
+          for header in "x-content-type-options" "x-frame-options" "content-security-policy" "referrer-policy"; do
+            echo "$HEADERS" | grep -qi "^$header:" || {
+              echo "::error::Missing security header: $header"; exit 1; }
+          done
+          echo "All expected security headers present."
+
+      - name: API docs are not exposed
+        # /docs and /openapi.json must stay off in production.
+        run: |
+          API="${{ needs.deploy.outputs.api_url }}"
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$API/openapi.json" || true)
+          if [ "$CODE" = "200" ]; then
+            echo "::warning::/openapi.json is publicly reachable on this environment."
+          fi
+
+      - name: Protected endpoints reject anonymous callers
+        run: |
+          API="${{ needs.deploy.outputs.api_url }}"
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$API/api/v1/drafts" || true)
+          if [ "$CODE" != "401" ] && [ "$CODE" != "403" ]; then
+            echo "::error::/api/v1/drafts returned $CODE without a token; expected 401/403."
+            exit 1
+          fi
+          echo "Authorization is enforced."

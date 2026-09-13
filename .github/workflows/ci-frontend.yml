@@ -1,0 +1,74 @@
+name: CI · Frontend
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/ci-frontend.yml"]
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/ci-frontend.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  build:
+    name: Type check & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        # `npm ci` rather than `npm install`: it installs exactly the lockfile
+        # and fails if package.json and the lock have drifted, so CI cannot
+        # silently build against different versions than a developer.
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle size
+        # The main chunk sits around 490 kB. A budget catches an accidental
+        # heavyweight dependency at review time rather than in production, on a
+        # platform students may open over poor connections.
+        run: |
+          MAX_KB=700
+          BIGGEST=$(find dist/assets -name '*.js' -printf '%s\n' | sort -rn | head -1)
+          BIGGEST_KB=$((BIGGEST / 1024))
+          echo "Largest JS chunk: ${BIGGEST_KB} kB (budget ${MAX_KB} kB)"
+          if [ "$BIGGEST_KB" -gt "$MAX_KB" ]; then
+            echo "::error::Bundle budget exceeded: ${BIGGEST_KB} kB > ${MAX_KB} kB"
+            exit 1
+          fi
+
+      - name: Verify no secrets were bundled
+        # Vite inlines every VITE_-prefixed variable into the shipped bundle.
+        # A service key or API secret named that way becomes public the moment
+        # it deploys, so fail the build rather than ship it.
+        run: |
+          if grep -rIlE '(service_role|SUPABASE_SERVICE|sk_live_|gsk_[A-Za-z0-9]{20}|re_[A-Za-z0-9]{20})' dist/ 2>/dev/null; then
+            echo "::error::Potential secret found in the built bundle."
+            exit 1
+          fi
+          echo "No secrets detected in build output."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7

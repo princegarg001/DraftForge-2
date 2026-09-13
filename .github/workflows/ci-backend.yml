@@ -1,0 +1,160 @@
+name: CI · Backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/ci-backend.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/ci-backend.yml"]
+  workflow_dispatch:
+
+# A new push supersedes the run in flight; there is no value in finishing CI
+# for a commit that has already been replaced.
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint:
+    name: Lint & type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install tooling
+        # Lint needs the linters, not the full runtime stack; installing
+        # fastembed and friends here would add minutes for no benefit.
+        run: pip install ruff mypy types-pyyaml types-redis pydantic
+
+      - name: Ruff (lint)
+        run: ruff check app tests --output-format=github
+
+      - name: Ruff (format)
+        run: ruff format --check app tests
+
+      - name: Mypy
+        # Non-blocking for now: the pre-existing codebase is largely
+        # unannotated, so failing on it would block every PR. app/core, app/db
+        # and dependencies.py are strict via pyproject overrides.
+        run: mypy app || echo "::warning::mypy reported issues (non-blocking)"
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        # conftest installs test-safe configuration before any app import, so
+        # no real credentials are needed. REDIS_URL points at the service
+        # container above so rate limiting is exercised rather than skipped.
+        env:
+          REDIS_URL: redis://localhost:6379/15
+          RATE_LIMIT_ENABLED: "True"
+        run: pytest --cov=app --cov-report=xml --cov-report=term-missing -q
+
+      - name: Enforce security test coverage
+        # The Phase 1 regression tests are the guard against reintroducing
+        # role self-assignment, the CORS wildcard and the upload bypasses.
+        # A green build that skipped them would be misleading.
+        run: pytest tests/security -q --no-cov
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: backend/coverage.xml
+          retention-days: 7
+
+  migrations:
+    name: Migration sanity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: draftforge_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check migrations apply in order
+        # Supabase-specific objects (auth.users, auth.uid()) are stubbed so the
+        # DDL can be exercised on plain Postgres. This catches ordering errors,
+        # typos and bad references before they reach a real database - it does
+        # not validate RLS behaviour, which needs Supabase.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d draftforge_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY);
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS UUID
+            LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+          CREATE ROLE authenticated;
+          CREATE ROLE anon;
+          SQL
+
+          for file in migrations/*.sql; do
+            echo "::group::Applying $file"
+            psql -h localhost -U postgres -d draftforge_test -v ON_ERROR_STOP=1 -f "$file"
+            echo "::endgroup::"
+          done
+
+      - name: Verify row-level security is enabled everywhere
+        # Guards against a future migration adding a table and forgetting RLS,
+        # which is exactly how migrations 001-004 ended up with none.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          UNPROTECTED=$(psql -h localhost -U postgres -d draftforge_test -tAc \
+            "SELECT string_agg(tablename, ', ')
+             FROM pg_tables
+             WHERE schemaname = 'public' AND NOT rowsecurity;")
+          if [ -n "$UNPROTECTED" ]; then
+            echo "::error::Tables without row-level security: $UNPROTECTED"
+            exit 1
+          fi
+          echo "All public tables have row-level security enabled."
