@@ -16,10 +16,88 @@ export interface UserProfile {
 export interface AuthResponse {
   access_token: string;
   token_type: string;
+  expires_in?: number | null;
+  refresh_token?: string | null;
   user_id: string;
   email: string;
   role: UserRole;
   full_name: string | null;
+}
+
+/** Server-resolved identity from /auth/me. Never carries tokens. */
+export interface AuthenticatedUser {
+  user_id: string;
+  email: string;
+  role: UserRole;
+  full_name: string | null;
+  is_active: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Classes, rosters and invitations
+// ---------------------------------------------------------------------------
+
+export interface ClassRoom {
+  id: string;
+  teacher_id: string;
+  name: string;
+  description: string | null;
+  institution: string | null;
+  academic_term: string | null;
+  join_code: string | null;
+  is_archived: boolean;
+  student_count: number;
+  created_at: string | null;
+}
+
+export type EnrollmentStatus = 'INVITED' | 'ACTIVE' | 'REMOVED';
+
+export interface Enrollment {
+  id: string;
+  class_id: string;
+  student_id: string | null;
+  email: string;
+  full_name: string | null;
+  status: EnrollmentStatus;
+  invited_at: string | null;
+  joined_at: string | null;
+}
+
+export interface PendingInvitation {
+  id: string;
+  email: string;
+  status: string;
+  expires_at: string | null;
+  send_count: number;
+  created_at: string | null;
+}
+
+export interface InviteOutcome {
+  email: string;
+  status: 'invited' | 'already_enrolled' | 'resent' | 'failed';
+  detail: string | null;
+}
+
+export interface BulkInviteResponse {
+  class_id: string;
+  total_submitted: number;
+  invited: number;
+  skipped: number;
+  failed: number;
+  results: InviteOutcome[];
+}
+
+/**
+ * Shown on the acceptance page before a password is set. Deliberately minimal -
+ * it does not reveal whether an account already exists for the address.
+ */
+export interface InvitationPreview {
+  email: string;
+  class_name: string;
+  institution: string | null;
+  teacher_name: string | null;
+  full_name: string | null;
+  expires_at: string | null;
 }
 
 export interface ReferenceDocument {

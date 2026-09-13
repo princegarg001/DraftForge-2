@@ -5,11 +5,15 @@ import { Navbar } from './components/common/Navbar';
 import { Sidebar } from './components/common/Sidebar';
 import { LandingPage } from './pages/LandingPage';
 import { AuthPage } from './pages/AuthPage';
+import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { TeacherDashboard } from './pages/TeacherDashboard';
+import { LoadingSpinner } from './components/common/LoadingSpinner';
+
+const INVITE_PATH = '/invite/accept';
 
 const MainLayout: React.FC = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const isTeacher = user?.role === 'TEACHER' || user?.role === 'ADMIN';
   const [activeTab, setActiveTab] = useState(isTeacher ? 'teacher_assignments' : 'workspace');
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -17,12 +21,28 @@ const MainLayout: React.FC = () => {
   const [unauthView, setUnauthView] = useState<'landing' | 'auth'>('landing');
 
   useEffect(() => {
-    if (isTeacher) {
-      setActiveTab('teacher_assignments');
-    } else {
-      setActiveTab('workspace');
-    }
+    // Teachers land on Classes: with invitation-based onboarding, building a
+    // roster is the first thing they need to do.
+    setActiveTab(isTeacher ? 'teacher_classes' : 'workspace');
   }, [isTeacher]);
+
+  // Invitation links land on a fixed path. Handled here rather than through a
+  // router, since the app navigates by state elsewhere and adding one library
+  // for a single public route is not worth the weight.
+  if (window.location.pathname.startsWith(INVITE_PATH) && !isAuthenticated) {
+    return <AcceptInvitePage />;
+  }
+
+  // A cached session is revalidated against /auth/me on mount. Rendering a
+  // dashboard before that resolves would briefly show a view based on a role
+  // read from localStorage, which the user controls.
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <LoadingSpinner size="md" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     if (unauthView === 'auth') {

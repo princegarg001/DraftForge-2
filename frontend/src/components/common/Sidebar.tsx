@@ -12,6 +12,7 @@ import {
   Users,
   UploadCloud,
   FileCheck,
+  School,
   ChevronLeft,
   ChevronRight,
   Sparkles,
@@ -97,6 +98,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const teacherNavItems = [
+    {
+      id: 'teacher_classes',
+      label: 'Classes & Roster',
+      icon: School,
+      badge: 'Students',
+      color: 'text-primary-400',
+    },
     {
       id: 'teacher_assignments',
       label: 'Manage Assignments',

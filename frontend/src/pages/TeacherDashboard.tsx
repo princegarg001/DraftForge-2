@@ -6,11 +6,13 @@ import { AssignmentManager } from '../components/teacher/AssignmentManager';
 import { SubmissionsAuditor } from '../components/teacher/SubmissionsAuditor';
 import { CohortAnalyticsView } from '../components/teacher/CohortAnalyticsView';
 import { ReferenceUploader } from '../components/teacher/ReferenceUploader';
+import { ClassManager } from '../components/teacher/ClassManager';
 import {
   FileCheck,
   ClipboardCheck,
   UploadCloud,
   Users,
+  School,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -90,6 +92,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
             {/* Quick Action Chips */}
             <div className="flex flex-wrap items-center gap-2 pt-2">
+              <button
+                onClick={() => setActiveTab('teacher_classes')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'teacher_classes'
+                    ? 'bg-primary-600 text-white shadow-md'
+                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                }`}
+              >
+                <School className="w-3.5 h-3.5 text-primary-400" />
+                <span>Classes &amp; Roster</span>
+              </button>
+
               <button
                 onClick={() => setActiveTab('teacher_assignments')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
@@ -184,6 +198,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       {/* 2. ACTIVE TEACHER TAB VIEW */}
       {/* ========================================================================= */}
       <div className="space-y-6">
+        {activeTab === 'teacher_classes' && <ClassManager />}
         {activeTab === 'teacher_assignments' && (
           <AssignmentManager onSelectAssignment={handleSelectAssignment} />
         )}
